@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-  from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -103,7 +103,7 @@ def task_new():
 def task_detail(task_id):
     task = Task.query.get_or_404(task_id)
     if not can_access(task):
-          abort(403)
+        abort(403)
     comment_form = TaskCommentForm()
     comments = task.comments.order_by(TaskComment.created_at.desc()).all()
     return render_template("tasks/detail.html", task=task, comment_form=comment_form, comments=comments)
