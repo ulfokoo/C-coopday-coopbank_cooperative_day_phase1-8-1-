@@ -484,7 +484,7 @@ def team_import_excel(team_id):
         flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
         return _back(team.id, section)
 
-        if section == "Invitation":
+    if section == "Invitation":
         return _invitation_import(team, section, ws)
 
     # Map each column to a known field, or treat it as a new custom field.
