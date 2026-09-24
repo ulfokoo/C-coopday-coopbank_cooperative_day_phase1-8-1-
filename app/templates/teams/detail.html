@@ -38,10 +38,9 @@
           <td class="fw-semibold">{{ m.display_name }}</td>
           <td>
             {% if can_manage_members %}
-            <form method="POST" action="{{ url_for('teams.team_member_window', team_id=team.id, member_id=m.id) }}" class="d-flex gap-1">
+            <form method="POST" action="{{ url_for('teams.team_member_window', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
-              <input type="text" name="window_label" value="{{ m.window_label or '' }}" placeholder="Window 1" maxlength="80" class="form-control form-control-sm" style="max-width:140px;">
-              <button class="btn btn-sm btn-outline-secondary">Save</button>
+              <input type="text" name="window_label" value="{{ m.window_label or '' }}" placeholder="Window 1" maxlength="80" class="form-control form-control-sm" style="max-width:160px;" onchange="this.form.submit()">
             </form>
             {% else %}{{ m.window_label or '—' }}{% endif %}
           </td>
