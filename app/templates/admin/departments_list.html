@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Departments{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Departments</h4>
+  <a href="{{ url_for('admin.department_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Department</a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Name</th><th>Description</th><th>Staff</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for d in departments %}
+        <tr>
+          <td class="fw-bold">{{ d.name }}</td>
+          <td>{{ d.description or '—' }}</td>
+          <td>{{ d.users.count() }}</td>
+          <td><span class="badge badge-status-{{ 'Active' if d.is_active else 'Inactive' }}">{{ 'Active' if d.is_active else 'Disabled' }}</span></td>
+          <td class="text-end"><a href="{{ url_for('admin.department_edit', dept_id=d.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No departments yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

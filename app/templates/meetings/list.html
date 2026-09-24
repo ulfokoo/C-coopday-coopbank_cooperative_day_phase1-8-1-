@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Meetings{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Meetings</h4>
+  <a href="{{ url_for('meetings.meeting_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Meeting</a>
+</div>
+<form class="mb-3" method="GET">
+  <select name="event_id" class="form-select" style="max-width:280px;" onchange="this.form.submit()">
+    <option value="">All Cooperative Day years</option>
+    {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+  </select>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Meeting</th><th>Cooperative Day</th><th>Date</th><th>Organizer</th><th>Team</th><th>Action Points</th><th></th></tr></thead>
+      <tbody>
+      {% for m in meetings %}
+        <tr>
+          <td class="fw-bold">{{ m.title }}</td>
+          <td>{{ m.cooperative_day.name }}</td>
+          <td>{{ m.meeting_date.strftime('%Y-%m-%d') }}{% if m.meeting_time %} {{ m.meeting_time.strftime('%H:%M') }}{% endif %}</td>
+          <td>{{ m.organizer.full_name if m.organizer else '—' }}</td>
+          <td>{{ m.team.name if m.team else '—' }}</td>
+          <td>{{ m.action_points.count() }}</td>
+          <td class="text-end"><a href="{{ url_for('meetings.meeting_detail', meeting_id=m.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No meetings scheduled.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

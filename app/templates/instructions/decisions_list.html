@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Decision Register{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Decision Register</h4>
+  <a href="{{ url_for('instructions.instructions_list') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Instructions</a>
+</div>
+
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-md-3">
+    <select name="event_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% if selected_event_id %}
+  <div class="col-md-3">
+    <a href="{{ url_for('instructions.decision_new', event_id=selected_event_id) }}" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>New Decision</a>
+  </div>
+  {% endif %}
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Decision</th><th>Cooperative Day</th><th>Meeting</th><th>Date</th><th>Responsible</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for d in decisions %}
+        <tr>
+          <td class="fw-bold">{{ d.title }}</td>
+          <td>{{ d.cooperative_day.name }}</td>
+          <td>{% if d.meeting %}<a href="{{ url_for('meetings.meeting_detail', meeting_id=d.meeting.id) }}">{{ d.meeting.title }}</a>{% else %}—{% endif %}</td>
+          <td>{{ d.decision_date.strftime('%Y-%m-%d') if d.decision_date else '—' }}</td>
+          <td>{{ d.responsible_user.full_name if d.responsible_user else '—' }}</td>
+          <td><span class="badge badge-status-{{ d.status|replace(' ', '') }}">{{ d.status }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No decisions recorded yet. Pick a Cooperative Day year above to add one, or add decisions directly from a meeting.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

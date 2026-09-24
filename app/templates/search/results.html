@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-search me-2"></i>Global Search</h4>
+
+<form class="mb-4" method="GET">
+  <div class="input-group input-group-lg">
+    <input type="text" name="q" class="form-control" placeholder="Search documents, tasks, letters, instructions, procurement, meetings, activities, users, teams..." value="{{ q }}" autofocus>
+    <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button>
+  </div>
+</form>
+
+{% if q %}
+  <p class="text-muted">{{ total_hits }} result{{ 's' if total_hits != 1 else '' }} for "<strong>{{ q }}</strong>"</p>
+
+  {% if not results %}
+    <div class="alert alert-light border">No matching records found.</div>
+  {% endif %}
+
+  {% if results.Documents %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-file-earmark-text me-2"></i>Documents ({{ results.Documents|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for d in results.Documents %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('documents.document_detail', document_id=d.id) }}">
+        <div class="fw-bold">{{ d.title }}</div>
+        <div class="small text-muted">{{ d.document_type }} · {{ d.cooperative_day.name }} · <span class="badge badge-status-{{ d.status|replace(' ','') }}">{{ d.status }}</span></div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Tasks %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-list-check me-2"></i>Tasks ({{ results.Tasks|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for t in results.Tasks %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('tasks.task_detail', task_id=t.id) }}">
+        <div class="fw-bold">{{ t.title }}</div>
+        <div class="small text-muted">{{ t.cooperative_day.name }} · {{ t.assigned_user.full_name if t.assigned_user else 'Unassigned' }} · <span class="badge badge-priority-{{ t.priority }}">{{ t.priority }}</span> · {{ t.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Correspondence %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-envelope-paper me-2"></i>Correspondence ({{ results.Correspondence|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for c in results.Correspondence %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('correspondence.correspondence_detail', correspondence_id=c.id) }}">
+        <div class="fw-bold">{{ c.reference_number }} — {{ c.subject }}</div>
+        <div class="small text-muted">{{ c.category }} · {{ c.from_party or '—' }} → {{ c.to_party or '—' }} · {{ c.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Instructions %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-clipboard-check me-2"></i>Instructions ({{ results.Instructions|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for i in results.Instructions %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('instructions.instruction_detail', instruction_id=i.id) }}">
+        <div class="fw-bold">{{ i.title }}</div>
+        <div class="small text-muted">{{ i.cooperative_day.name }} · {{ i.responsible_user.full_name if i.responsible_user else '—' }} · {{ i.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Procurement %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-cart-check me-2"></i>Procurement ({{ results.Procurement|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for r in results.Procurement %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('procurement.request_detail', request_id=r.id) }}">
+        <div class="fw-bold">{{ r.request_number }} — {{ r.item_service }}</div>
+        <div class="small text-muted">{{ r.cooperative_day.name }} · {{ r.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Meetings %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-calendar3 me-2"></i>Meetings ({{ results.Meetings|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for m in results.Meetings %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('meetings.meeting_detail', meeting_id=m.id) }}">
+        <div class="fw-bold">{{ m.title }}</div>
+        <div class="small text-muted">{{ m.meeting_date.strftime('%Y-%m-%d') if m.meeting_date else '—' }} · {{ m.cooperative_day.name }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Activities %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-flag me-2"></i>Activities ({{ results.Activities|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for a in results.Activities %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('activities.activity_detail', activity_id=a.id) }}">
+        <div class="fw-bold">{{ a.name }}</div>
+        <div class="small text-muted">{{ a.cooperative_day.name }} · {{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '—' }} · {{ a.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Users %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-person-badge me-2"></i>Users ({{ results.Users|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for u in results.Users %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_edit', user_id=u.id) }}">
+        <div class="fw-bold">{{ u.full_name }}</div>
+        <div class="small text-muted">{{ u.username }} · {{ u.email }} · {{ u.role.name if u.role else '—' }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.Teams %}
+  <div class="card mb-3"><div class="card-header fw-bold"><i class="bi bi-people me-2"></i>Teams ({{ results.Teams|length }})</div>
+    <div class="list-group list-group-flush">
+      {% for t in results.Teams %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('teams.team_detail', team_id=t.id) }}">
+        <div class="fw-bold">{{ t.name }}</div>
+        <div class="small text-muted">{{ t.cooperative_day.name }} · {{ t.status }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+{% else %}
+  <p class="text-muted">Type something above to search across the whole system.</p>
+{% endif %}
+{% endblock %}

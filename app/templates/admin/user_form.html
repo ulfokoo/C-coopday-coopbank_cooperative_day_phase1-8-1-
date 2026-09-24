@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New User' if is_new else 'Edit User' }}{% endblock %}
+{% block content %}
+<h4 class="mb-4">{{ 'New User' if is_new else 'Edit User: ' + user.full_name }}</h4>
+<div class="card" style="max-width:640px;">
+  <div class="card-body">
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">{{ form.full_name.label(class="form-label") }}{{ form.full_name(class="form-control") }}</div>
+      <div class="row">
+        <div class="col-md-6 mb-3">{{ form.username.label(class="form-label") }}{{ form.username(class="form-control") }}</div>
+        <div class="col-md-6 mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control") }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">{{ form.phone.label(class="form-label") }}{{ form.phone(class="form-control") }}</div>
+        <div class="col-md-6 mb-3">{{ form.position.label(class="form-label") }}{{ form.position(class="form-control") }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">{{ form.department_id.label(class="form-label") }}{{ form.department_id(class="form-select") }}</div>
+        <div class="col-md-6 mb-3">{{ form.role_id.label(class="form-label") }}{{ form.role_id(class="form-select") }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">{{ form.status.label(class="form-label") }}{{ form.status(class="form-select") }}</div>
+        <div class="col-md-6 mb-3">{{ form.password.label(class="form-label") }}{{ form.password(class="form-control", placeholder="Leave blank to keep current" if not is_new else "") }}</div>
+      </div>
+      <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary">Cancel</a>
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  </div>
+</div>
+{% endblock %}

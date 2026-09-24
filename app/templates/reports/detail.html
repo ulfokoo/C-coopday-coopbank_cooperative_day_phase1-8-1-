@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}{{ ctx.event.name }} — Annual Report{% endblock %}
+{% block content %}
+{% set event = ctx.event %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <div class="text-muted small mb-1"><a href="{{ url_for('reports.reports_list') }}">Annual Reports</a> / {{ event.year }}</div>
+    <h4 class="mb-0">{{ event.name }} — Annual Report</h4>
+    <div class="text-muted small">{{ event.theme or 'No theme set' }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <span class="badge badge-status-{{ report.status|replace(' ', '') }} align-self-center" style="font-size:.85rem;">{{ report.status }}</span>
+    {% if current_user.has_permission('generate_reports') %}
+    <a href="{{ url_for('reports.report_edit', event_id=event.id) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Narrative</a>
+    <a href="{{ url_for('reports.report_pdf', event_id=event.id) }}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+    <a href="{{ url_for('reports.report_excel', event_id=event.id) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">Location</div><div class="fw-bold">{{ event.location or '—' }}</div></div>
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">Start Date</div><div class="fw-bold">{{ event.start_date or '—' }}</div></div>
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">End Date</div><div class="fw-bold">{{ event.end_date or '—' }}</div></div>
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">Event Status</div><span class="badge badge-status-{{ event.status }}">{{ event.status }}</span></div>
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">Coordinator</div><div class="fw-bold">{{ event.coordinator.full_name if event.coordinator else '—' }}</div></div>
+      <div class="col-md-2 col-6"><div class="text-muted small text-uppercase">Prepared By</div><div class="fw-bold">{{ report.prepared_by.full_name if report.prepared_by else '—' }}</div></div>
+    </div>
+  </div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Participation</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.teams_total }}</div><div class="stat-label">Teams / Committees</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.staff_total }}</div><div class="stat-label">Staff Involved</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.meetings_total }}</div><div class="stat-label">Meetings Held</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.decisions_total }}</div><div class="stat-label">Decisions Recorded</div></div></div></div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Tasks</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.tasks_total }}</div><div class="stat-label">Total Tasks</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.tasks_completed }}</div><div class="stat-label">Completed</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.tasks_not_completed }}</div><div class="stat-label">Not Completed</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat" style="border-left-color:#dc3545;"><div class="card-body"><div class="stat-value text-danger">{{ ctx.tasks_overdue }}</div><div class="stat-label">Overdue</div></div></div></div>
+</div>
+<div class="progress mb-4" style="height:.8rem;">
+  <div class="progress-bar bg-success" style="width: {{ ctx.tasks_completion_rate }}%;">{{ ctx.tasks_completion_rate }}%</div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Documents, Correspondence &amp; Instructions</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.documents_total }}</div><div class="stat-label">Documents</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.correspondence_total }}</div><div class="stat-label">Correspondence</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.instructions_total }}</div><div class="stat-label">Instructions</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat" style="border-left-color:#dc3545;"><div class="card-body"><div class="stat-value text-danger">{{ ctx.instructions_overdue }}</div><div class="stat-label">Instructions Overdue</div></div></div></div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Procurement &amp; Purchases</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.procurement_total }}</div><div class="stat-label">Purchase Requests</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.procurement_completed }}</div><div class="stat-label">Completed Purchases</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.suppliers_used }}</div><div class="stat-label">Suppliers Used</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ "%.2f"|format(ctx.estimated_cost_total) }}</div><div class="stat-label">Estimated Cost (Total)</div></div></div></div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Activities &amp; Communication</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.activities_total }}</div><div class="stat-label">Activities</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.activities_completed }}</div><div class="stat-label">Activities Completed</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.communications_total }}</div><div class="stat-label">Communication Items</div></div></div></div>
+  <div class="col-md-3 col-6"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ ctx.communications_published }}</div><div class="stat-label">Published</div></div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Tasks by Status</div>
+      <div class="card-body"><canvas id="chartTasks" height="200"></canvas></div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Procurement by Status</div>
+      <div class="card-body"><canvas id="chartProc" height="200"></canvas></div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Activities by Status</div>
+      <div class="card-body"><canvas id="chartAct" height="200"></canvas></div></div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Teams / Committees ({{ ctx.teams_total }})</div>
+      <ul class="list-group list-group-flush">
+        {% for t in ctx.teams %}
+        <li class="list-group-item d-flex justify-content-between">
+          <a href="{{ url_for('teams.team_detail', team_id=t.id) }}">{{ t.name }}</a>
+          <span class="text-muted small">{{ t.leader.full_name if t.leader else 'No leader' }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No teams recorded for this year.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Staff Participation ({{ ctx.staff_total }})</div>
+      <div class="card-body" style="max-height:260px; overflow-y:auto;">
+        {% for u in ctx.staff %}
+          <span class="badge bg-light text-dark border me-1 mb-1">{{ u.full_name }}{% if u.department %} · {{ u.department.name }}{% endif %}</span>
+        {% else %}
+          <div class="text-muted">No participation recorded yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if photos_docs %}
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Photos &amp; Supporting Documents</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>Title</th><th>Type</th><th>Uploaded By</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        {% for d in photos_docs %}
+        <tr>
+          <td>{{ d.title }}</td><td>{{ d.document_type }}</td>
+          <td>{{ d.uploaded_by.full_name if d.uploaded_by else '—' }}</td>
+          <td class="small text-muted">{{ d.created_at.strftime('%Y-%m-%d') }}</td>
+          <td><a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header bg-white fw-bold">Narrative Report</div>
+  <div class="card-body">
+    <h6 class="text-uppercase small text-muted">Executive Summary</h6>
+    <p>{{ report.executive_summary or "Not yet documented." }}</p>
+    <h6 class="text-uppercase small text-muted">Key Achievements</h6>
+    <p>{{ report.key_achievements or "Not yet documented." }}</p>
+    <h6 class="text-uppercase small text-muted">Challenges</h6>
+    <p>{{ report.challenges or "Not yet documented." }}</p>
+    <h6 class="text-uppercase small text-muted">Lessons Learned</h6>
+    <p>{{ report.lessons_learned or "Not yet documented." }}</p>
+    <h6 class="text-uppercase small text-muted mb-0">Recommendations</h6>
+    <p class="mb-0">{{ report.recommendations or "Not yet documented." }}</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const PALETTE = ['#0a4d2e', '#0d6efd', '#fd7e14', '#198754', '#dc3545', '#6610f2', '#ffc107', '#0dcaf0', '#6c757d', '#212529'];
+function doughnut(id, labels, data) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new Chart(el, { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: PALETTE }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } } });
+}
+doughnut('chartTasks', {{ ctx.tasks_by_status | map(attribute='status') | list | tojson }}, {{ ctx.tasks_by_status | map(attribute='count') | list | tojson }});
+doughnut('chartProc', {{ ctx.procurement_by_status | map(attribute='status') | list | tojson }}, {{ ctx.procurement_by_status | map(attribute='count') | list | tojson }});
+doughnut('chartAct', {{ ctx.activities_by_status | map(attribute='status') | list | tojson }}, {{ ctx.activities_by_status | map(attribute='count') | list | tojson }});
+</script>
+{% endblock %}

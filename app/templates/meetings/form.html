@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Meeting' if is_new else 'Edit Meeting' }}{% endblock %}
+{% block content %}
+<h4 class="mb-3">{{ 'New Meeting' if is_new else 'Edit Meeting: ' ~ meeting.title }}</h4>
+<div class="card"><div class="card-body">
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-8">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.cooperative_day_id.label(class="form-label") }}
+      {{ form.cooperative_day_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.meeting_date.label(class="form-label") }}
+      {{ form.meeting_date(class="form-control", type="date") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.meeting_time.label(class="form-label") }}
+      {{ form.meeting_time(class="form-control", type="time") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.location.label(class="form-label") }}
+      {{ form.location(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.organizer_id.label(class="form-label") }}
+      {{ form.organizer_id(class="form-select") }}
+    </div>
+    <div class="col-md-6">
+      {{ form.team_id.label(class="form-label") }}
+      {{ form.team_id(class="form-select") }}
+    </div>
+    <div class="col-12">
+      {{ form.agenda.label(class="form-label") }}
+      {{ form.agenda(class="form-control", rows=4) }}
+    </div>
+  </div>
+  <div class="mt-4">
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('meetings.meetings_list') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

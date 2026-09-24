@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ material.item_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ material.item_name }}
+      <span class="badge badge-status-{{ material.status }}">{{ material.status }}</span>
+      {% if material.shortfall > 0 %}<span class="badge bg-warning text-dark">Shortfall: {{ material.shortfall }}</span>{% endif %}
+    </h4>
+    <div class="text-muted">{{ material.category or 'No category' }} &middot; {{ material.cooperative_day.name }}</div>
+  </div>
+  {% if current_user.has_permission('manage_materials') %}
+  <a href="{{ url_for('procurement.material_edit', material_id=material.id) }}" class="btn btn-outline-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ material.quantity_required }}</div><div class="stat-label">Required</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ material.quantity_available }}</div><div class="stat-label">Available</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ material.quantity_purchased }}</div><div class="stat-label">Purchased</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ material.responsible_user.full_name if material.responsible_user else '—' }}</div><div class="stat-label">Responsible</div></div></div></div>
+</div>
+
+{% if material.location %}<div class="card mb-4"><div class="card-body"><strong>Location:</strong> {{ material.location }}</div></div>{% endif %}
+{% if material.notes %}<div class="card mb-4"><div class="card-body"><strong>Notes:</strong> {{ material.notes }}</div></div>{% endif %}
+
+{% if current_user.has_permission('manage_materials') %}
+<div class="card">
+  <div class="card-header bg-white fw-bold">Status</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    {% for s in ['Needed', 'Requested', 'Purchased', 'Available', 'Deployed', 'Returned'] %}
+    <form method="POST" action="{{ url_for('procurement.material_status', material_id=material.id, new_status=s) }}">
+      <button class="btn btn-sm {% if material.status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ s }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ pr.request_number }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ pr.request_number }} &mdash; {{ pr.item_service }}
+      <span class="badge badge-priority-{{ pr.priority }}">{{ pr.priority }}</span>
+      <span class="badge badge-status-{{ pr.status|replace(' ', '') }}">{{ pr.status }}</span>
+      {% if pr.is_overdue %}<span class="badge bg-danger">Overdue</span>{% endif %}
+    </h4>
+    <div class="text-muted">{{ pr.cooperative_day.name }} &middot; {{ pr.department.name if pr.department else 'No department' }} &middot; {{ pr.team.name if pr.team else 'No team' }}</div>
+  </div>
+  {% if current_user.has_permission('create_purchase_request') %}
+  <a href="{{ url_for('procurement.request_edit', request_id=pr.id) }}" class="btn btn-outline-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ pr.requested_by.full_name if pr.requested_by else '—' }}</div><div class="stat-label">Requested By</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ '%.2f'|format(pr.estimated_cost) if pr.estimated_cost else '—' }}</div><div class="stat-label">Estimated Cost</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ pr.required_date.strftime('%Y-%m-%d') if pr.required_date else '—' }}</div><div class="stat-label">Required Date</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ pr.supplier.name if pr.supplier else '—' }}</div><div class="stat-label">Supplier</div></div></div></div>
+</div>
+
+{% if current_user.has_permission('approve_purchase') %}
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Workflow</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    {% for s in ['Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected', 'Procurement', 'Ordered', 'Delivered', 'Completed', 'Cancelled'] %}
+    <form method="POST" action="{{ url_for('procurement.request_status', request_id=pr.id, new_status=s) }}">
+      <button class="btn btn-sm {% if pr.status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ s }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Description &amp; Justification</div>
+      <div class="card-body">
+        <p class="mb-2"><strong>Description:</strong> {{ pr.description or '—' }}</p>
+        <p class="mb-0"><strong>Justification:</strong> {{ pr.justification or '—' }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Order, Delivery &amp; Payment</div>
+      <div class="card-body">
+        <p class="mb-1"><strong>PO Number:</strong> {{ pr.po_number or '—' }} &middot; <strong>Order Date:</strong> {{ pr.order_date.strftime('%Y-%m-%d') if pr.order_date else '—' }}</p>
+        <p class="mb-1"><strong>Expected Delivery:</strong> {{ pr.expected_delivery_date.strftime('%Y-%m-%d') if pr.expected_delivery_date else '—' }} &middot; <strong>Actual:</strong> {{ pr.actual_delivery_date.strftime('%Y-%m-%d') if pr.actual_delivery_date else '—' }}</p>
+        <p class="mb-1"><strong>Inspected By:</strong> {{ pr.inspected_by.full_name if pr.inspected_by else '—' }} {% if pr.inspection_notes %}&mdash; {{ pr.inspection_notes }}{% endif %}</p>
+        <p class="mb-0"><strong>Payment:</strong> <span class="badge bg-secondary">{{ pr.payment_status }}</span>
+          {% if pr.paid_amount %} &middot; {{ '%.2f'|format(pr.paid_amount) }}{% endif %}
+          {% if pr.payment_date %} on {{ pr.payment_date.strftime('%Y-%m-%d') }}{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Line Items ({{ pr.items.count() }})</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Item</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Responsible</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for item in pr.items %}
+        <tr>
+          <td class="fw-bold">{{ item.item_name }}{% if item.notes %}<div class="text-muted small">{{ item.notes }}</div>{% endif %}</td>
+          <td>{{ item.quantity }} {{ item.unit or '' }}</td>
+          <td>{{ '%.2f'|format(item.unit_cost) if item.unit_cost else '—' }}</td>
+          <td>{{ '%.2f'|format(item.line_total) if item.unit_cost else '—' }}</td>
+          <td>{{ item.responsible_user.full_name if item.responsible_user else '—' }}</td>
+          <td><span class="badge badge-status-{{ item.status|replace(' ', '') }}">{{ item.status }}</span></td>
+          <td class="text-end">
+            {% if current_user.has_permission('create_purchase_request') %}
+            <div class="dropdown d-inline">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Status</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                {% for s in ['Requested', 'Ordered', 'Delivered', 'Completed', 'Cancelled'] %}
+                <li><form method="POST" action="{{ url_for('procurement.item_status', item_id=item.id, new_status=s) }}"><button class="dropdown-item">{{ s }}</button></form></li>
+                {% endfor %}
+              </ul>
+            </div>
+            <form method="POST" action="{{ url_for('procurement.item_delete', item_id=item.id) }}" class="d-inline" onsubmit="return confirm('Remove this item?');">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-3">No line items added yet.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if pr.items.count() %}
+      <tfoot><tr><th colspan="3" class="text-end">Items Total</th><th>{{ '%.2f'|format(pr.items_total_cost) }}</th><th colspan="3"></th></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+  {% if current_user.has_permission('create_purchase_request') %}
+  <div class="card-body border-top">
+    <form method="POST" action="{{ url_for('procurement.item_new', request_id=pr.id) }}">
+      {{ item_form.hidden_tag() }}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">{{ item_form.item_name.label(class="form-label small") }}{{ item_form.item_name(class="form-control form-control-sm") }}</div>
+        <div class="col-md-1">{{ item_form.quantity.label(class="form-label small") }}{{ item_form.quantity(class="form-control form-control-sm") }}</div>
+        <div class="col-md-2">{{ item_form.unit.label(class="form-label small") }}{{ item_form.unit(class="form-control form-control-sm") }}</div>
+        <div class="col-md-2">{{ item_form.unit_cost.label(class="form-label small") }}{{ item_form.unit_cost(class="form-control form-control-sm") }}</div>
+        <div class="col-md-2">{{ item_form.responsible_user_id.label(class="form-label small") }}{{ item_form.responsible_user_id(class="form-select form-select-sm") }}</div>
+        <div class="col-md-2">{{ item_form.submit(class="btn btn-sm btn-outline-primary w-100") }}</div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-bold">Supporting Documents</span>
+    {% if current_user.has_permission('upload_documents') %}
+    <a href="{{ url_for('documents.document_new') }}" class="btn btn-sm btn-outline-primary">Upload Document</a>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% for d in pr.documents %}
+      <a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="badge bg-light text-dark border me-1">{{ d.title }}</a>
+    {% else %}
+      <p class="text-muted mb-0">No documents linked yet. Upload one and set its "Related Procurement" field, or attach from the document's edit screen.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

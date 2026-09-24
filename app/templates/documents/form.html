@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Upload Document{% endblock %}
+{% block content %}
+<h4 class="mb-3">Upload Document</h4>
+<div class="card"><div class="card-body">
+<form method="POST" enctype="multipart/form-data">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-8">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.document_type.label(class="form-label") }}
+      {{ form.document_type(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.cooperative_day_id.label(class="form-label") }}
+      {{ form.cooperative_day_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.department_id.label(class="form-label") }}
+      {{ form.department_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.team_id.label(class="form-label") }}
+      {{ form.team_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.task_id.label(class="form-label") }}
+      {{ form.task_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.meeting_id.label(class="form-label") }}
+      {{ form.meeting_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.instruction_id.label(class="form-label") }}
+      {{ form.instruction_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.correspondence_id.label(class="form-label") }}
+      {{ form.correspondence_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.procurement_request_id.label(class="form-label") }}
+      {{ form.procurement_request_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.owner_id.label(class="form-label") }}
+      {{ form.owner_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.confidentiality_level.label(class="form-label") }}
+      {{ form.confidentiality_level(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.tags.label(class="form-label") }}
+      {{ form.tags(class="form-control", placeholder="e.g. plan, 2026, final") }}
+    </div>
+    <div class="col-12">
+      {{ form.description.label(class="form-label") }}
+      {{ form.description(class="form-control", rows=3) }}
+    </div>
+    <div class="col-md-8">
+      {{ form.file.label(class="form-label") }}
+      {{ form.file(class="form-control") }}
+      {% for err in form.file.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+    </div>
+    <div class="col-md-4">
+      {{ form.version_notes.label(class="form-label") }}
+      {{ form.version_notes(class="form-control") }}
+    </div>
+  </div>
+  <div class="mt-4">
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('documents.documents_list') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

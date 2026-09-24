@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Executive Dashboard</h4>
+    <div class="text-muted small">{% if active_event %}Current focus: {{ active_event.name }}{% else %}No Cooperative Day created yet{% endif %}</div>
+  </div>
+  {% if current_user.has_permission('create_event') %}
+  <a href="{{ url_for('events.event_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Cooperative Day</a>
+  {% endif %}
+</div>
+
+<form class="row g-2 mb-4" method="GET">
+  <div class="col-md-2 col-6">
+    <select name="event_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2 col-6">
+    <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Departments</option>
+      {% for d in departments %}<option value="{{ d.id }}" {% if d.id == selected_department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2 col-6">
+    <select name="team_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Teams</option>
+      {% for t in teams %}<option value="{{ t.id }}" {% if t.id == selected_team_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2 col-6">
+    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Task Statuses</option>
+      {% for s in task_statuses %}<option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3 col-6">
+    <select name="responsible_user_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Responsible Persons</option>
+      {% for u in users %}<option value="{{ u.id }}" {% if u.id == selected_responsible_user_id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-1 col-6">
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_events }}</div>
+      <div class="stat-label">Cooperative Day Years</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_teams }}</div>
+      <div class="stat-label">Teams / Committees</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_staff }}</div>
+      <div class="stat-label">Active Staff</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ active_event.status if active_event else '—' }}</div>
+      <div class="stat-label">Current Year Status</div>
+    </div></div>
+  </div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Tasks</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_tasks }}</div>
+      <div class="stat-label">Total Tasks</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ completed_tasks }}</div>
+      <div class="stat-label">Completed Tasks</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ pending_tasks }}</div>
+      <div class="stat-label">Pending Tasks</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat" style="border-left-color:#dc3545;"><div class="card-body">
+      <div class="stat-value text-danger">{{ overdue_tasks }}</div>
+      <div class="stat-label">Overdue Tasks</div>
+    </div></div>
+  </div>
+</div>
+
+<h6 class="text-muted text-uppercase small mb-2">Documents, Instructions &amp; Procurement</h6>
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ tasks_due_soon }}</div>
+      <div class="stat-label">Tasks Due Soon (7 days)</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ open_instructions }}</div>
+      <div class="stat-label">Open Instructions</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat" style="border-left-color:#dc3545;"><div class="card-body">
+      <div class="stat-value text-danger">{{ overdue_instructions }}</div>
+      <div class="stat-label">Overdue Instructions</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_documents }}</div>
+      <div class="stat-label">Total Documents</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ pending_document_approvals }}</div>
+      <div class="stat-label">Pending Document Approvals</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ total_purchase_requests }}</div>
+      <div class="stat-label">Total Purchase Requests</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ pending_purchase_requests }}</div>
+      <div class="stat-label">Pending Purchase Requests</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ completed_purchases }}</div>
+      <div class="stat-label">Completed Purchases</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card card-stat"><div class="card-body">
+      <div class="stat-value">{{ upcoming_activities_count }}</div>
+      <div class="stat-label">Upcoming Activities</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Task Completion</div>
+      <div class="card-body"><canvas id="chartTaskStatus" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Procurement Status</div>
+      <div class="card-body"><canvas id="chartProcStatus" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Document Status</div>
+      <div class="card-body"><canvas id="chartDocStatus" height="220"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Activities by Team</div>
+      <div class="card-body"><canvas id="chartActivitiesByDept" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Tasks by Team</div>
+      <div class="card-body"><canvas id="chartTasksByTeam" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Progress by Year (% Tasks Completed)</div>
+      <div class="card-body"><canvas id="chartProgressByYear" height="220"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Upcoming Meetings</div>
+      <ul class="list-group list-group-flush">
+        {% for m in upcoming_meetings %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{{ url_for('meetings.meeting_detail', meeting_id=m.id) }}">{{ m.title }}</a>
+          <span class="text-muted small">{{ m.meeting_date.strftime('%Y-%m-%d') }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No upcoming meetings scheduled.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold">Upcoming Activities</div>
+      <ul class="list-group list-group-flush">
+        {% for a in upcoming_activities %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{{ url_for('activities.activity_detail', activity_id=a.id) }}">{{ a.name }}</a>
+          <span class="text-muted small">{{ a.activity_date.strftime('%Y-%m-%d') }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No upcoming activities scheduled.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white fw-bold">All Cooperative Day Years</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Year</th><th>Name</th><th>Theme</th><th>Status</th><th>Coordinator</th><th></th></tr></thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td class="fw-bold">{{ e.year }}</td>
+          <td>{{ e.name }}</td>
+          <td>{{ e.theme or '—' }}</td>
+          <td><span class="badge badge-status-{{ e.status }}">{{ e.status }}</span></td>
+          <td>{{ e.coordinator.full_name if e.coordinator else '—' }}</td>
+          <td><a href="{{ url_for('events.event_detail', event_id=e.id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No Cooperative Day events yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const PALETTE = ['#0a4d2e', '#0d6efd', '#fd7e14', '#198754', '#dc3545', '#6610f2', '#ffc107', '#0dcaf0', '#6c757d', '#212529'];
+
+function makeBarChart(canvasId, labels, data, label) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  new Chart(el, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: PALETTE }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+function makeDoughnutChart(canvasId, labels, data) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  new Chart(el, {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: PALETTE }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
+  });
+}
+
+function makeLineChart(canvasId, labels, data, label) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  new Chart(el, {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: label, data: data, borderColor: '#0a4d2e', backgroundColor: 'rgba(10,77,46,0.15)', fill: true, tension: 0.3 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
+  });
+}
+
+makeDoughnutChart('chartTaskStatus', {{ task_status_chart.labels|tojson }}, {{ task_status_chart.data|tojson }});
+makeDoughnutChart('chartProcStatus', {{ proc_status_chart.labels|tojson }}, {{ proc_status_chart.data|tojson }});
+makeDoughnutChart('chartDocStatus', {{ doc_status_chart.labels|tojson }}, {{ doc_status_chart.data|tojson }});
+makeBarChart('chartActivitiesByDept', {{ activities_by_dept_chart.labels|tojson }}, {{ activities_by_dept_chart.data|tojson }}, 'Activities');
+makeBarChart('chartTasksByTeam', {{ tasks_by_team_chart.labels|tojson }}, {{ tasks_by_team_chart.data|tojson }}, 'Tasks');
+makeLineChart('chartProgressByYear', {{ progress_by_year_chart.labels|tojson }}, {{ progress_by_year_chart.data|tojson }}, '% Completed');
+</script>
+{% endblock %}

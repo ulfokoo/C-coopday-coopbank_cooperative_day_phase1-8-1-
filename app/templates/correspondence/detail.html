@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ record.reference_number }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ record.reference_number }} &mdash; {{ record.subject }}
+      <span class="badge badge-priority-{{ record.priority }}">{{ record.priority }}</span>
+      <span class="badge badge-status-{{ record.status|replace(' ', '') }}">{{ record.status }}</span>
+      {% if record.is_overdue %}<span class="badge bg-danger">Overdue</span>{% endif %}
+    </h4>
+    <div class="text-muted">{{ record.category }} &middot; {{ record.cooperative_day.name }}</div>
+  </div>
+  {% if current_user.has_permission('upload_documents') %}
+  <a href="{{ url_for('correspondence.correspondence_edit', correspondence_id=record.id) }}" class="btn btn-outline-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ record.from_party or '—' }}</div><div class="stat-label">From</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ record.to_party or '—' }}</div><div class="stat-label">To</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ record.responsible_user.full_name if record.responsible_user else '—' }}</div><div class="stat-label">Responsible</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ record.response_deadline.strftime('%Y-%m-%d') if record.response_deadline else '—' }}</div><div class="stat-label">Response Deadline</div></div></div></div>
+</div>
+
+{% if record.notes %}<div class="card mb-4"><div class="card-body">{{ record.notes }}</div></div>{% endif %}
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Lifecycle</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    {% for s in ['Received', 'Assigned', 'In Progress', 'Responded', 'Closed'] %}
+    <form method="POST" action="{{ url_for('correspondence.correspondence_status', correspondence_id=record.id, new_status=s) }}">
+      <button class="btn btn-sm {% if record.status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ s }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-bold">Attachments</span>
+    {% if current_user.has_permission('upload_documents') %}
+    <a href="{{ url_for('documents.document_new') }}" class="btn btn-sm btn-outline-primary">Upload Attachment</a>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% for d in record.attachments %}
+      <a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="badge bg-light text-dark border me-1">{{ d.title }}</a>
+    {% else %}
+      <p class="text-muted mb-0">No attachments linked yet. Upload a document and set its "Related Correspondence" field, or attach from the document's edit screen.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Purchase Requests{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Purchase Requests</h4>
+  {% if current_user.has_permission('create_purchase_request') %}
+  <a href="{{ url_for('procurement.request_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Request</a>
+  {% endif %}
+</div>
+
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-md-2">
+    <select name="event_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="department_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Departments</option>
+      {% for d in departments %}<option value="{{ d.id }}" {% if d.id == selected_department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <input type="text" name="q" class="form-control" placeholder="Search request # or item..." value="{{ keyword }}">
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Request #</th><th>Item / Service</th><th>Department</th><th>Est. Cost</th><th>Required Date</th><th>Priority</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in requests %}
+        <tr class="{% if r.is_overdue %}table-danger{% endif %}">
+          <td class="fw-bold">{{ r.request_number }}</td>
+          <td>{{ r.item_service }}</td>
+          <td>{{ r.department.name if r.department else '—' }}</td>
+          <td>{{ '%.2f'|format(r.estimated_cost) if r.estimated_cost else '—' }}</td>
+          <td>{{ r.required_date.strftime('%Y-%m-%d') if r.required_date else '—' }}</td>
+          <td><span class="badge badge-priority-{{ r.priority }}">{{ r.priority }}</span></td>
+          <td><span class="badge badge-status-{{ r.status|replace(' ', '') }}">{{ r.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('procurement.request_detail', request_id=r.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No purchase requests yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

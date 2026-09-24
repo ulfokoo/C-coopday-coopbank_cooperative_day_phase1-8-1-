@@ -1,0 +1,140 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import login_required
+
+from app.extensions import db
+from app.models.team import Team, TeamMember
+from app.models.event import CooperativeDay
+from app.models.user import User
+from app.teams.forms import TeamForm, TeamMemberForm
+from app.utils.decorators import permission_required
+from app.utils.audit import log_action
+
+teams_bp = Blueprint("teams", __name__)
+
+
+@teams_bp.route("/")
+@login_required
+@permission_required("manage_teams")
+def teams_list():
+    event_id = request.args.get("event_id", type=int)
+    query = Team.query
+    if event_id:
+        query = query.filter_by(cooperative_day_id=event_id)
+    teams = query.order_by(Team.cooperative_day_id.desc(), Team.name).all()
+    events = CooperativeDay.query.order_by(CooperativeDay.year.desc()).all()
+    return render_template("teams/list.html", teams=teams, events=events, selected_event_id=event_id)
+
+
+@teams_bp.route("/new", methods=["GET", "POST"])
+@login_required
+@permission_required("manage_teams")
+def team_new():
+    form = TeamForm()
+    _populate_choices(form)
+    if form.validate_on_submit():
+        team = Team(
+            name=form.name.data,
+            description=form.description.data,
+            cooperative_day_id=form.cooperative_day_id.data,
+            leader_id=form.leader_id.data or None,
+            start_date=form.start_date.data,
+            end_date=form.end_date.data,
+            status=form.status.data,
+        )
+        db.session.add(team)
+        db.session.flush()
+        log_action("create", "Team", team.id, f"Created team {team.name}")
+        db.session.commit()
+        flash(f"Team '{team.name}' created.", "success")
+        return redirect(url_for("teams.team_detail", team_id=team.id))
+    return render_template("teams/form.html", form=form, is_new=True)
+
+
+@teams_bp.route("/<int:team_id>")
+@login_required
+@permission_required("manage_teams")
+def team_detail(team_id):
+    team = Team.query.get_or_404(team_id)
+    member_form = TeamMemberForm()
+    _populate_member_choices(member_form, team)
+    return render_template("teams/detail.html", team=team, member_form=member_form)
+
+
+@teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
+@login_required
+@permission_required("manage_teams")
+def team_edit(team_id):
+    team = Team.query.get_or_404(team_id)
+    form = TeamForm(obj=team)
+    _populate_choices(form)
+    if request.method == "GET":
+        form.leader_id.data = team.leader_id or 0
+
+    if form.validate_on_submit():
+        team.name = form.name.data
+        team.description = form.description.data
+        team.cooperative_day_id = form.cooperative_day_id.data
+        team.leader_id = form.leader_id.data or None
+        team.start_date = form.start_date.data
+        team.end_date = form.end_date.data
+        team.status = form.status.data
+        log_action("update", "Team", team.id, f"Updated team {team.name}")
+        db.session.commit()
+        flash(f"Team '{team.name}' updated.", "success")
+        return redirect(url_for("teams.team_detail", team_id=team.id))
+    return render_template("teams/form.html", form=form, is_new=False, team=team)
+
+
+@teams_bp.route("/<int:team_id>/members/add", methods=["POST"])
+@login_required
+@permission_required("manage_teams")
+def team_member_add(team_id):
+    team = Team.query.get_or_404(team_id)
+    form = TeamMemberForm()
+    _populate_member_choices(form, team)
+    if form.validate_on_submit():
+        exists = TeamMember.query.filter_by(team_id=team.id, user_id=form.user_id.data).first()
+        if exists:
+            flash("That staff member is already on this team.", "warning")
+        else:
+            member = TeamMember(
+                team_id=team.id, user_id=form.user_id.data, role_in_team=form.role_in_team.data or "Member"
+            )
+            db.session.add(member)
+            db.session.flush()
+            log_action("create", "TeamMember", member.id, f"Added user {member.user_id} to team {team.id}")
+            db.session.commit()
+            flash("Member added to team.", "success")
+    else:
+        flash("Could not add member — please pick a staff member.", "danger")
+    return redirect(url_for("teams.team_detail", team_id=team.id))
+
+
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/remove", methods=["POST"])
+@login_required
+@permission_required("manage_teams")
+def team_member_remove(team_id, member_id):
+    member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+    log_action("delete", "TeamMember", member.id, f"Removed user {member.user_id} from team {team_id}")
+    db.session.delete(member)
+    db.session.commit()
+    flash("Member removed from team.", "info")
+    return redirect(url_for("teams.team_detail", team_id=team_id))
+
+
+def _populate_choices(form):
+    form.cooperative_day_id.choices = [
+        (e.id, e.name) for e in CooperativeDay.query.order_by(CooperativeDay.year.desc())
+    ]
+    form.leader_id.choices = [(0, "— None —")] + [
+        (u.id, u.full_name) for u in User.query.filter_by(status="Active").order_by(User.full_name)
+    ]
+
+
+def _populate_member_choices(form, team):
+    existing_ids = [m.user_id for m in team.members]
+    form.user_id.choices = [
+        (u.id, f"{u.full_name} ({u.username})")
+        for u in User.query.filter_by(status="Active").order_by(User.full_name)
+        if u.id not in existing_ids
+    ]

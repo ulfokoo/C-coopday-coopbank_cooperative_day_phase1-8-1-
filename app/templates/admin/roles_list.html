@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Roles &amp; Permissions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Roles &amp; Permissions</h4>
+  <a href="{{ url_for('admin.role_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Role</a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th>Users</th><th></th></tr></thead>
+      <tbody>
+      {% for r in roles %}
+        <tr>
+          <td class="fw-bold">{{ r.name }} {% if r.is_super_admin %}<span class="badge bg-dark">full access</span>{% endif %}</td>
+          <td>{{ r.description or '—' }}</td>
+          <td>{{ 'All' if r.is_super_admin else r.permissions|length }}</td>
+          <td>{{ r.users.count() }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.role_edit', role_id=r.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            {% if not r.is_system %}
+            <form method="POST" action="{{ url_for('admin.role_delete', role_id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this role?');">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

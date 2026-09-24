@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ meeting.title }}</h4>
+    <div class="text-muted">{{ meeting.cooperative_day.name }} &middot; {{ meeting.meeting_date.strftime('%Y-%m-%d') }}{% if meeting.meeting_time %} at {{ meeting.meeting_time.strftime('%H:%M') }}{% endif %}{% if meeting.location %} &middot; {{ meeting.location }}{% endif %}</div>
+  </div>
+  <a href="{{ url_for('meetings.meeting_edit', meeting_id=meeting.id) }}" class="btn btn-outline-secondary">Edit</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-header bg-white fw-bold">Agenda</div>
+      <div class="card-body">{{ meeting.agenda or 'No agenda recorded.' }}</div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header bg-white fw-bold">Minutes</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('meetings.meeting_minutes_save', meeting_id=meeting.id) }}">
+          {{ minutes_form.hidden_tag() }}
+          {{ minutes_form.minutes(class="form-control mb-2", rows=6) }}
+          {{ minutes_form.submit(class="btn btn-primary btn-sm") }}
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header bg-white fw-bold">Participants</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('meetings.participant_add', meeting_id=meeting.id) }}" class="row g-2 align-items-end mb-3">
+          {{ participant_form.hidden_tag() }}
+          <div class="col-8">{{ participant_form.user_id(class="form-select") }}</div>
+          <div class="col-4">{{ participant_form.submit(class="btn btn-primary w-100") }}</div>
+        </form>
+        <ul class="list-group list-group-flush">
+        {% for p in meeting.participants %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            {{ p.user.full_name }}
+            <form method="POST" action="{{ url_for('meetings.participant_toggle_attended', meeting_id=meeting.id, participant_id=p.id) }}">
+              <button class="btn btn-sm {% if p.attended %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ 'Attended' if p.attended else 'Mark Attended' }}</button>
+            </form>
+          </li>
+        {% else %}
+          <li class="list-group-item px-0 text-muted">No participants added yet.</li>
+        {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-header bg-white fw-bold">Action Points</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('meetings.action_point_add', meeting_id=meeting.id) }}" class="mb-3">
+          {{ action_form.hidden_tag() }}
+          {{ action_form.description(class="form-control mb-2", rows=2, placeholder="Describe the action point...") }}
+          <div class="row g-2">
+            <div class="col-6">{{ action_form.responsible_user_id(class="form-select") }}</div>
+            <div class="col-4">{{ action_form.due_date(class="form-control", type="date") }}</div>
+            <div class="col-2">{{ action_form.submit(class="btn btn-primary w-100") }}</div>
+          </div>
+        </form>
+        {% for ap in meeting.action_points %}
+        <div class="border-bottom pb-2 mb-2">
+          <div>{{ ap.description }}</div>
+          <div class="small text-muted">{{ ap.responsible_user.full_name if ap.responsible_user else 'Unassigned' }}{% if ap.due_date %} &middot; Due {{ ap.due_date.strftime('%Y-%m-%d') }}{% endif %}</div>
+          <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge badge-status-{{ ap.status|replace(' ', '') }}">{{ ap.status }}</span>
+            {% for s in ['Open', 'In Progress', 'Completed', 'Cancelled'] %}
+            <form method="POST" action="{{ url_for('meetings.action_point_status', action_point_id=ap.id, new_status=s) }}">
+              <button class="btn btn-sm btn-outline-secondary">{{ s }}</button>
+            </form>
+            {% endfor %}
+            {% if ap.task_id %}
+              <a href="{{ url_for('tasks.task_detail', task_id=ap.task_id) }}" class="badge bg-success text-decoration-none">View Task</a>
+            {% elif current_user.has_permission('manage_tasks') %}
+              <form method="POST" action="{{ url_for('meetings.action_point_promote', action_point_id=ap.id) }}">
+                <button class="btn btn-sm btn-outline-primary">Promote to Task</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          <p class="text-muted mb-0">No action points recorded yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if meeting.decisions.count() %}
+    <div class="card">
+      <div class="card-header bg-white fw-bold">Decisions from this Meeting</div>
+      <div class="card-body">
+        {% for d in meeting.decisions %}
+          <div class="mb-1"><span class="badge badge-status-{{ d.status|replace(' ', '') }}">{{ d.status }}</span> {{ d.title }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

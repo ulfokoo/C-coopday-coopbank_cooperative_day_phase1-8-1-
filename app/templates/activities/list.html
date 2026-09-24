@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Activities{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Event Activities</h4>
+  {% if current_user.has_permission('manage_activities') %}
+  <a href="{{ url_for('activities.activity_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Activity</a>
+  {% endif %}
+</div>
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-auto">
+    <select name="event_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Cooperative Day years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="team_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All teams</option>
+      {% for t in teams %}<option value="{{ t.id }}" {% if t.id == selected_team_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Activity</th><th>Cooperative Day</th><th>Date</th><th>Location</th><th>Team</th><th>Responsible</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for a in activities %}
+        <tr>
+          <td class="fw-bold">{{ a.name }}<div class="small text-muted">{{ a.activity_type or '' }}</div></td>
+          <td>{{ a.cooperative_day.name }}</td>
+          <td>{{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '—' }}{% if a.start_time %} {{ a.start_time.strftime('%H:%M') }}{% endif %}</td>
+          <td>{{ a.location or '—' }}</td>
+          <td>{{ a.team.name if a.team else '—' }}</td>
+          <td>{{ a.responsible_user.full_name if a.responsible_user else '—' }}</td>
+          <td><span class="badge badge-status-{{ a.status|replace(' ', '') }}">{{ a.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('activities.activity_detail', activity_id=a.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No activities scheduled yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

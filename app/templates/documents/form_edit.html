@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Edit Document{% endblock %}
+{% block content %}
+<h4 class="mb-3">Edit Document: {{ document.title }}</h4>
+<div class="card"><div class="card-body">
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-8">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.document_type.label(class="form-label") }}
+      {{ form.document_type(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.cooperative_day_id.label(class="form-label") }}
+      {{ form.cooperative_day_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.department_id.label(class="form-label") }}
+      {{ form.department_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.team_id.label(class="form-label") }}
+      {{ form.team_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.task_id.label(class="form-label") }}
+      {{ form.task_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.meeting_id.label(class="form-label") }}
+      {{ form.meeting_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.instruction_id.label(class="form-label") }}
+      {{ form.instruction_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.correspondence_id.label(class="form-label") }}
+      {{ form.correspondence_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.procurement_request_id.label(class="form-label") }}
+      {{ form.procurement_request_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.owner_id.label(class="form-label") }}
+      {{ form.owner_id(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.confidentiality_level.label(class="form-label") }}
+      {{ form.confidentiality_level(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.tags.label(class="form-label") }}
+      {{ form.tags(class="form-control") }}
+    </div>
+    <div class="col-12">
+      {{ form.description.label(class="form-label") }}
+      {{ form.description(class="form-control", rows=3) }}
+    </div>
+  </div>
+  <div class="mt-4">
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('documents.document_detail', document_id=document.id) }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

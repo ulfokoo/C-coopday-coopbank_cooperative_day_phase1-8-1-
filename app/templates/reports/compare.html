@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Year Comparison{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0">Cooperative Day — Year Comparison</h4>
+    <div class="text-muted small">Compare activities, staff, tasks, documents and procurement across years.</div>
+  </div>
+  {% if contexts and current_user.has_permission('generate_reports') %}
+  <a href="{{ url_for('reports.compare_excel', years=selected_ids|join(',')) }}" class="btn btn-outline-success">
+    <i class="bi bi-file-earmark-excel me-1"></i>Export Comparison (Excel)
+  </a>
+  {% endif %}
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="GET">
+      <label class="form-label fw-bold small text-uppercase text-muted">Select Cooperative Day years to compare</label>
+      <div class="d-flex flex-wrap gap-3 mb-3">
+        {% for e in all_events|sort(attribute='year') %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="years" value="{{ e.id }}" id="yr{{ e.id }}"
+                 {% if e.id in selected_ids %}checked{% endif %}>
+          <label class="form-check-label" for="yr{{ e.id }}">{{ e.year }}</label>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Compare Selected</button>
+    </form>
+  </div>
+</div>
+
+{% if not contexts %}
+<div class="text-center text-muted py-5">Select at least one Cooperative Day year above to see the comparison.</div>
+{% else %}
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Tasks Completed vs Overdue, by Year</div>
+      <div class="card-body"><canvas id="chartTasksByYear" height="220"></canvas></div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-header bg-white fw-bold">Activities &amp; Procurement, by Year</div>
+      <div class="card-body"><canvas id="chartOpsByYear" height="220"></canvas></div></div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Side-by-Side Comparison</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          {% for c in contexts %}<th class="text-center">{{ c.event.year }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, label in metrics %}
+        <tr>
+          <td class="fw-bold">{{ label }}</td>
+          {% for c in contexts %}<td class="text-center">{{ c[key] }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for c in contexts %}
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-bold d-flex justify-content-between">
+        <span>{{ c.event.year }} — {{ c.event.name }}</span>
+        <span class="badge badge-status-{{ c.event.status }}">{{ c.event.status }}</span>
+      </div>
+      <div class="card-body small">
+        <div class="mb-1"><strong>Theme:</strong> {{ c.event.theme or '—' }}</div>
+        <div class="mb-1"><strong>Challenges:</strong> {{ (c.event.annual_report.challenges if c.event.annual_report else none) or 'Not yet documented.' }}</div>
+        <div class="mb-1"><strong>Lessons Learned:</strong> {{ (c.event.annual_report.lessons_learned if c.event.annual_report else none) or 'Not yet documented.' }}</div>
+        <a href="{{ url_for('reports.report_detail', event_id=c.event.id) }}" class="btn btn-sm btn-outline-secondary mt-2">Open Full Report</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+{% if contexts %}
+const labels = {{ chart_data.labels | tojson }};
+new Chart(document.getElementById('chartTasksByYear'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Tasks Completed', data: {{ contexts | map(attribute='tasks_completed') | list | tojson }}, backgroundColor: '#198754' },
+      { label: 'Tasks Overdue', data: {{ contexts | map(attribute='tasks_overdue') | list | tojson }}, backgroundColor: '#dc3545' },
+    ]
+  },
+  options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+new Chart(document.getElementById('chartOpsByYear'), {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Activities', data: {{ contexts | map(attribute='activities_total') | list | tojson }}, backgroundColor: '#0a4d2e' },
+      { label: 'Procurement Requests', data: {{ contexts | map(attribute='procurement_total') | list | tojson }}, backgroundColor: '#fd7e14' },
+      { label: 'Documents', data: {{ contexts | map(attribute='documents_total') | list | tojson }}, backgroundColor: '#0d6efd' },
+    ]
+  },
+  options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+{% endif %}
+</script>
+{% endblock %}

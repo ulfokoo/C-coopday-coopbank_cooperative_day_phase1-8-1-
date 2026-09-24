@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Documents</h4>
+  {% if current_user.has_permission('upload_documents') %}
+  <a href="{{ url_for('documents.document_new') }}" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload Document</a>
+  {% endif %}
+</div>
+
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-md-2">
+    <select name="event_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="document_type" class="form-select" onchange="this.form.submit()">
+      <option value="">All Types</option>
+      {% for t in document_types %}<option value="{{ t }}" {% if t == selected_document_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="department_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Departments</option>
+      {% for d in departments %}<option value="{{ d.id }}" {% if d.id == selected_department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="team_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Teams</option>
+      {% for t in teams %}<option value="{{ t.id }}" {% if t.id == selected_team_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <input type="text" name="q" class="form-control" placeholder="Search title, tags..." value="{{ keyword }}">
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Title</th><th>Type</th><th>Cooperative Day</th><th>Department</th><th>Latest Version</th><th>Confidentiality</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for d in documents %}
+        <tr>
+          <td class="fw-bold">{{ d.title }}</td>
+          <td>{{ d.document_type }}</td>
+          <td>{{ d.cooperative_day.name }}</td>
+          <td>{{ d.department.name if d.department else '—' }}</td>
+          <td>{{ d.latest_version.version_label if d.latest_version else '—' }}</td>
+          <td>{{ d.confidentiality_level }}</td>
+          <td><span class="badge badge-status-{{ d.status|replace(' ', '') }}">{{ d.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No documents found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

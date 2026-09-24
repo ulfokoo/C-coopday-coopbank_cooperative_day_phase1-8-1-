@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Materials & Assets{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Materials &amp; Assets</h4>
+  {% if current_user.has_permission('manage_materials') %}
+  <a href="{{ url_for('procurement.material_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Material</a>
+  {% endif %}
+</div>
+
+<form class="row g-2 mb-3" method="GET">
+  <div class="col-md-3">
+    <select name="event_id" class="form-select" onchange="this.form.submit()">
+      <option value="">All Years</option>
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Item</th><th>Category</th><th>Required</th><th>Available</th><th>Purchased</th><th>Shortfall</th><th>Responsible</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for m in materials %}
+        <tr class="{% if m.shortfall > 0 %}table-warning{% endif %}">
+          <td class="fw-bold">{{ m.item_name }}</td>
+          <td>{{ m.category or '—' }}</td>
+          <td>{{ m.quantity_required }}</td>
+          <td>{{ m.quantity_available }}</td>
+          <td>{{ m.quantity_purchased }}</td>
+          <td>{{ m.shortfall }}</td>
+          <td>{{ m.responsible_user.full_name if m.responsible_user else '—' }}</td>
+          <td><span class="badge badge-status-{{ m.status }}">{{ m.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('procurement.material_detail', material_id=m.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No materials tracked yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ event.name }} <span class="badge badge-status-{{ event.status }}">{{ event.status }}</span></h4>
+    <div class="text-muted">{{ event.theme or 'No theme set' }}</div>
+  </div>
+  <div>
+    {% if current_user.has_permission('view_reports') %}
+    <a href="{{ url_for('reports.report_detail', event_id=event.id) }}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-bar-graph me-1"></i>Annual Report</a>
+    {% endif %}
+    {% if current_user.has_permission('edit_event') %}
+    <a href="{{ url_for('events.event_edit', event_id=event.id) }}" class="btn btn-outline-secondary">Edit</a>
+    {% endif %}
+    {% if current_user.has_permission('delete_event') and event.status != 'Cancelled' %}
+    <form method="POST" action="{{ url_for('events.event_archive', event_id=event.id) }}" class="d-inline" onsubmit="return confirm('Mark this Cooperative Day as Cancelled? The record is preserved, not deleted.');">
+      <button class="btn btn-outline-danger">Archive</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ event.year }}</div><div class="stat-label">Year</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ teams|length }}</div><div class="stat-label">Teams</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ event.location or '—' }}</div><div class="stat-label">Location</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ event.coordinator.full_name if event.coordinator else '—' }}</div><div class="stat-label">Coordinator</div></div></div></div>
+</div>
+
+{% if event.description %}
+<div class="card mb-4"><div class="card-body">{{ event.description }}</div></div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <a href="{{ url_for('tasks.tasks_list', event_id=event.id) }}" class="text-decoration-none text-dark">
+      <div class="card card-stat h-100"><div class="card-body">
+        <div class="stat-value">{{ stats.task_completed }}/{{ stats.task_count }}</div>
+        <div class="stat-label">Tasks Completed</div>
+      </div></div>
+    </a>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('activities.activities_list', event_id=event.id) }}" class="text-decoration-none text-dark">
+      <div class="card card-stat h-100"><div class="card-body">
+        <div class="stat-value">{{ stats.activity_completed }}/{{ stats.activity_count }}</div>
+        <div class="stat-label">Activities Completed</div>
+      </div></div>
+    </a>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('communication.communication_list', event_id=event.id) }}" class="text-decoration-none text-dark">
+      <div class="card card-stat h-100"><div class="card-body">
+        <div class="stat-value">{{ stats.communication_published }}/{{ stats.communication_count }}</div>
+        <div class="stat-label">Media Items Published</div>
+      </div></div>
+    </a>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('documents.documents_list', event_id=event.id) }}" class="text-decoration-none text-dark">
+      <div class="card card-stat h-100"><div class="card-body">
+        <div class="stat-value">{{ stats.document_count }}</div>
+        <div class="stat-label">Documents</div>
+      </div></div>
+    </a>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-bold">Upcoming Activities</span>
+    {% if current_user.has_permission('manage_activities') %}
+    <a href="{{ url_for('activities.activity_new') }}" class="btn btn-sm btn-primary">Add Activity</a>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Activity</th><th>Date</th><th>Team</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for a in upcoming_activities %}
+        <tr>
+          <td class="fw-bold">{{ a.name }}</td>
+          <td>{{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '—' }}</td>
+          <td>{{ a.team.name if a.team else '—' }}</td>
+          <td><span class="badge badge-status-{{ a.status|replace(' ', '') }}">{{ a.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('activities.activity_detail', activity_id=a.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No upcoming activities for this Cooperative Day.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-bold">Teams &amp; Committees</span>
+    {% if current_user.has_permission('manage_teams') %}
+    <a href="{{ url_for('teams.team_new') }}" class="btn btn-sm btn-primary">Add Team</a>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Team</th><th>Leader</th><th>Members</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for t in teams %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{{ t.leader.full_name if t.leader else '—' }}</td>
+          <td>{{ t.members.count() }}</td>
+          <td><span class="badge badge-status-{{ t.status }}">{{ t.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('teams.team_detail', team_id=t.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No teams created for this Cooperative Day yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

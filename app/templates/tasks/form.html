@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Task' if is_new else 'Edit Task' }}{% endblock %}
+{% block content %}
+<h4 class="mb-3">{{ 'New Task' if is_new else 'Edit Task: ' ~ task.title }}</h4>
+<div class="card"><div class="card-body">
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-8">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.cooperative_day_id.label(class="form-label") }}
+      {{ form.cooperative_day_id(class="form-select") }}
+    </div>
+    <div class="col-12">
+      {{ form.description.label(class="form-label") }}
+      {{ form.description(class="form-control", rows=3) }}
+    </div>
+    <div class="col-md-3">
+      {{ form.department_id.label(class="form-label") }}
+      {{ form.department_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.team_id.label(class="form-label") }}
+      {{ form.team_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.assigned_user_id.label(class="form-label") }}
+      {{ form.assigned_user_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.priority.label(class="form-label") }}
+      {{ form.priority(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.status.label(class="form-label") }}
+      {{ form.status(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.percent_complete.label(class="form-label") }}
+      {{ form.percent_complete(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.start_date.label(class="form-label") }}
+      {{ form.start_date(class="form-control", type="date") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.due_date.label(class="form-label") }}
+      {{ form.due_date(class="form-control", type="date") }}
+    </div>
+  </div>
+  <div class="mt-4">
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('tasks.tasks_list') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

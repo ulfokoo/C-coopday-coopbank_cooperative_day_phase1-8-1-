@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ team.name }} <span class="badge badge-status-{{ team.status }}">{{ team.status }}</span></h4>
+    <div class="text-muted">{{ team.cooperative_day.name }} &middot; Leader: {{ team.leader.full_name if team.leader else 'Not assigned' }}</div>
+  </div>
+  <a href="{{ url_for('teams.team_edit', team_id=team.id) }}" class="btn btn-outline-secondary">Edit</a>
+</div>
+
+{% if team.description %}
+<div class="card mb-4"><div class="card-body">{{ team.description }}</div></div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Team Members</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Name</th><th>Role in Team</th><th>Department</th><th>Joined</th><th></th></tr></thead>
+      <tbody>
+      {% for m in team.members %}
+        <tr>
+          <td>{{ m.user.full_name }}</td>
+          <td>{{ m.role_in_team }}</td>
+          <td>{{ m.user.department.name if m.user.department else '—' }}</td>
+          <td>{{ m.joined_at.strftime('%Y-%m-%d') }}</td>
+          <td class="text-end">
+            <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this member?');">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No members yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white fw-bold">Add Member</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}" class="row g-2 align-items-end">
+      {{ member_form.hidden_tag() }}
+      <div class="col-md-6">
+        {{ member_form.user_id.label(class="form-label") }}
+        {{ member_form.user_id(class="form-select") }}
+      </div>
+      <div class="col-md-4">
+        {{ member_form.role_in_team.label(class="form-label") }}
+        {{ member_form.role_in_team(class="form-control") }}
+      </div>
+      <div class="col-md-2">
+        {{ member_form.submit(class="btn btn-primary w-100") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

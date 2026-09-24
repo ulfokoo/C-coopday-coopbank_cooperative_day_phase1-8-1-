@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ activity.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ activity.name }} <span class="badge badge-status-{{ activity.status|replace(' ', '') }}">{{ activity.status }}</span></h4>
+    <div class="text-muted">
+      {{ activity.cooperative_day.name }}
+      {% if activity.activity_date %} &middot; {{ activity.activity_date.strftime('%Y-%m-%d') }}{% endif %}
+      {% if activity.start_time %} {{ activity.start_time.strftime('%H:%M') }}{% if activity.end_time %}–{{ activity.end_time.strftime('%H:%M') }}{% endif %}{% endif %}
+      {% if activity.location %} &middot; {{ activity.location }}{% endif %}
+    </div>
+  </div>
+  {% if current_user.has_permission('manage_activities') %}
+  <a href="{{ url_for('activities.activity_edit', activity_id=activity.id) }}" class="btn btn-outline-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ activity.activity_type or '—' }}</div><div class="stat-label">Type</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ activity.team.name if activity.team else '—' }}</div><div class="stat-label">Responsible Team</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ activity.responsible_user.full_name if activity.responsible_user else '—' }}</div><div class="stat-label">Responsible Person</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ activity.participants.count() }}</div><div class="stat-label">Participants</div></div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card mb-4">
+      <div class="card-header bg-white fw-bold">Description</div>
+      <div class="card-body">{{ activity.description or 'No description recorded.' }}</div>
+    </div>
+    <div class="card mb-4">
+      <div class="card-header bg-white fw-bold">Requirements</div>
+      <div class="card-body">{{ activity.requirements or 'No requirements recorded.' }}{% if activity.budget_reference %}<div class="small text-muted mt-2">Budget reference: {{ activity.budget_reference }}</div>{% endif %}</div>
+    </div>
+    {% if current_user.has_permission('manage_activities') %}
+    <div class="card">
+      <div class="card-header bg-white fw-bold">Update Status</div>
+      <div class="card-body d-flex flex-wrap gap-2">
+        {% for s in ['Planned', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'] %}
+        <form method="POST" action="{{ url_for('activities.activity_status', activity_id=activity.id, new_status=s) }}">
+          <button class="btn btn-sm {% if activity.status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ s }}</button>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header bg-white fw-bold">Participants</div>
+      <div class="card-body">
+        {% if current_user.has_permission('manage_activities') %}
+        <form method="POST" action="{{ url_for('activities.participant_add', activity_id=activity.id) }}" class="row g-2 align-items-end mb-3">
+          {{ participant_form.hidden_tag() }}
+          <div class="col-8">{{ participant_form.user_id(class="form-select") }}</div>
+          <div class="col-4">{{ participant_form.submit(class="btn btn-primary w-100") }}</div>
+        </form>
+        {% endif %}
+        <ul class="list-group list-group-flush">
+        {% for p in activity.participants %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            {{ p.user.full_name }}
+            <span class="d-flex gap-2">
+              {% if current_user.has_permission('manage_activities') %}
+              <form method="POST" action="{{ url_for('activities.participant_toggle_attended', activity_id=activity.id, participant_id=p.id) }}">
+                <button class="btn btn-sm {% if p.attended %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ 'Attended' if p.attended else 'Mark Attended' }}</button>
+              </form>
+              <form method="POST" action="{{ url_for('activities.participant_remove', activity_id=activity.id, participant_id=p.id) }}" onsubmit="return confirm('Remove this participant?');">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>
+              </form>
+              {% endif %}
+            </span>
+          </li>
+        {% else %}
+          <li class="list-group-item px-0 text-muted">No participants added yet.</li>
+        {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+:root {
+  --cbo-primary: #0a4d2e;
+  --cbo-primary-dark: #073a22;
+  --cbo-accent: #d4a017;
+}
+
+body { background-color: #f4f6f8; }
+
+.sidebar {
+  min-height: 100vh;
+  background: var(--cbo-primary-dark);
+}
+.sidebar .nav-link {
+  color: rgba(255,255,255,.85);
+  padding: .55rem 1rem;
+  border-radius: .375rem;
+  margin: .1rem .5rem;
+}
+.sidebar .nav-link.active, .sidebar .nav-link:hover {
+  background: var(--cbo-primary);
+  color: #fff;
+}
+.sidebar .nav-header {
+  color: rgba(255,255,255,.5);
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .75rem 1rem .25rem;
+}
+.navbar-brand { font-weight: 700; color: var(--cbo-primary) !important; }
+
+.card-stat { border: none; border-left: 4px solid var(--cbo-primary); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.card-stat .stat-value { font-size: 1.8rem; font-weight: 700; }
+.card-stat .stat-label { color: #6c757d; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+
+.btn-primary { background-color: var(--cbo-primary); border-color: var(--cbo-primary); }
+.btn-primary:hover { background-color: var(--cbo-primary-dark); border-color: var(--cbo-primary-dark); }
+
+.badge-status-Planning { background: #6c757d; }
+.badge-status-Preparation { background: #0d6efd; }
+.badge-status-Procurement { background: #fd7e14; }
+.badge-status-Implementation { background: #6610f2; }
+.badge-status-Completed { background: #198754; }
+.badge-status-Cancelled { background: #dc3545; }
+.badge-status-Active { background: #198754; }
+.badge-status-Inactive { background: #6c757d; }
+.badge-status-Suspended { background: #dc3545; }
+
+/* Tasks / Instructions / Action Points / Decisions
+   NOTE: templates strip spaces from status names before building the class,
+   e.g. {{ 'badge-status-' ~ status|replace(' ', '') }} -> badge-status-NotStarted */
+.badge-status-NotStarted { background: #6c757d; }
+.badge-status-New { background: #0dcaf0; color: #000; }
+.badge-status-Assigned { background: #0d6efd; }
+.badge-status-Waiting { background: #ffc107; color: #000; }
+.badge-status-Overdue { background: #dc3545; }
+.badge-status-Closed { background: #212529; }
+.badge-status-Open { background: #0d6efd; }
+.badge-status-Implemented { background: #198754; }
+
+/* Documents */
+.badge-status-Draft { background: #6c757d; }
+.badge-status-Submitted { background: #0d6efd; }
+.badge-status-UnderReview { background: #fd7e14; }
+.badge-status-Approved { background: #198754; }
+.badge-status-Rejected { background: #dc3545; }
+.badge-status-Archived { background: #212529; }
+
+/* Correspondence */
+.badge-status-Received { background: #0dcaf0; color: #000; }
+.badge-status-Responded { background: #198754; }
+
+/* Procurement (Draft/Submitted/UnderReview/Approved/Rejected/Completed/Cancelled
+   reuse the Documents/Events classes above) */
+.badge-status-Ordered { background: #6610f2; }
+.badge-status-Delivered { background: #20c997; }
+
+/* Materials */
+.badge-status-Needed { background: #dc3545; }
+.badge-status-Requested { background: #0dcaf0; color: #000; }
+
+/* Activities */
+.badge-status-Planned { background: #6c757d; }
+.badge-status-Confirmed { background: #0d6efd; }
+.badge-status-InProgress { background: #6610f2; }
+
+/* Communication / Media */
+.badge-status-Published { background: #198754; }
+.badge-status-Pending { background: #ffc107; color: #000; }
+.badge-status-Purchased { background: #6610f2; }
+.badge-status-Available { background: #198754; }
+.badge-status-Deployed { background: #0d6efd; }
+.badge-status-Returned { background: #6c757d; }
+
+/* Priority badges */
+.badge-priority-Low { background: #6c757d; }
+.badge-priority-Medium { background: #0d6efd; }
+.badge-priority-High { background: #fd7e14; }
+.badge-priority-Critical { background: #dc3545; }
+
+.table thead th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: #6c757d; border-top: none; }
+.progress { height: .55rem; }

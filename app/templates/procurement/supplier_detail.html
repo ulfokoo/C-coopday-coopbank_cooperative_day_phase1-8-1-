@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ supplier.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ supplier.name }}
+      <span class="badge badge-status-{{ supplier.status }}">{{ supplier.status }}</span>
+    </h4>
+    <div class="text-muted">{{ supplier.service_category or 'No category set' }}</div>
+  </div>
+  {% if current_user.has_permission('manage_suppliers') %}
+  <a href="{{ url_for('procurement.supplier_edit', supplier_id=supplier.id) }}" class="btn btn-outline-secondary">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ supplier.contact_person or '—' }}</div><div class="stat-label">Contact Person</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ supplier.phone or '—' }}</div><div class="stat-label">Phone</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ supplier.email or '—' }}</div><div class="stat-label">Email</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ supplier.registration_info or '—' }}</div><div class="stat-label">Registration Info</div></div></div></div>
+</div>
+
+{% if supplier.address %}<div class="card mb-4"><div class="card-body"><strong>Address:</strong> {{ supplier.address }}</div></div>{% endif %}
+{% if supplier.notes %}<div class="card mb-4"><div class="card-body"><strong>Notes:</strong> {{ supplier.notes }}</div></div>{% endif %}
+
+<div class="card">
+  <div class="card-header bg-white fw-bold">Linked Purchase Requests ({{ linked_requests|length }})</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Request #</th><th>Item / Service</th><th>Cooperative Day</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in linked_requests %}
+        <tr>
+          <td class="fw-bold">{{ r.request_number }}</td>
+          <td>{{ r.item_service }}</td>
+          <td>{{ r.cooperative_day.name }}</td>
+          <td><span class="badge badge-status-{{ r.status|replace(' ', '') }}">{{ r.status }}</span></td>
+          <td class="text-end"><a href="{{ url_for('procurement.request_detail', request_id=r.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No purchase requests linked to this supplier yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

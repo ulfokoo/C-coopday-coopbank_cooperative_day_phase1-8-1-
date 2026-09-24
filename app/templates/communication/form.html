@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Communication Item' if is_new else 'Edit Communication Item' }}{% endblock %}
+{% block content %}
+<h4 class="mb-4">{{ 'New Communication / Media Item' if is_new else 'Edit Communication / Media Item' }}</h4>
+<div class="card">
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label">{{ form.title.label }}</label>
+          {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else "")) }}
+          {% for e in form.title.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.communication_type.label }}</label>
+          {{ form.communication_type(class="form-select") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.cooperative_day_id.label }}</label>
+          {{ form.cooperative_day_id(class="form-select") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.team_id.label }}</label>
+          {{ form.team_id(class="form-select") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.responsible_user_id.label }}</label>
+          {{ form.responsible_user_id(class="form-select") }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.target_audience.label }}</label>
+          {{ form.target_audience(class="form-control") }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.platform.label }}</label>
+          {{ form.platform(class="form-control", placeholder="e.g. Facebook, CoopBank website, ETV") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.planned_date.label }}</label>
+          {{ form.planned_date(class="form-control", type="date") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.publication_date.label }}</label>
+          {{ form.publication_date(class="form-control", type="date") }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ form.status.label }}</label>
+          {{ form.status(class="form-select") }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{{ form.description.label }}</label>
+          {{ form.description(class="form-control", rows=4) }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{{ form.file.label }}</label>
+          {{ form.file(class="form-control" + (" is-invalid" if form.file.errors else "")) }}
+          {% for e in form.file.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+          {% if item and item.has_attachment %}
+            <div class="form-text">Current file: {{ item.original_filename }} — uploading a new one will replace it.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="mt-4">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('communication.communication_list') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

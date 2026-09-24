@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Log Correspondence' if is_new else 'Edit Correspondence' }}{% endblock %}
+{% block content %}
+<h4 class="mb-3">{{ 'Log Correspondence' if is_new else 'Edit Correspondence: ' ~ record.reference_number }}</h4>
+<div class="card"><div class="card-body">
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-4">
+      {{ form.reference_number.label(class="form-label") }}
+      {{ form.reference_number(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.category.label(class="form-label") }}
+      {{ form.category(class="form-select") }}
+    </div>
+    <div class="col-md-4">
+      {{ form.cooperative_day_id.label(class="form-label") }}
+      {{ form.cooperative_day_id(class="form-select") }}
+    </div>
+    <div class="col-12">
+      {{ form.subject.label(class="form-label") }}
+      {{ form.subject(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      {{ form.from_party.label(class="form-label") }}
+      {{ form.from_party(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      {{ form.to_party.label(class="form-label") }}
+      {{ form.to_party(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.date_received.label(class="form-label") }}
+      {{ form.date_received(class="form-control", type="date") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.date_sent.label(class="form-label") }}
+      {{ form.date_sent(class="form-control", type="date") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.response_deadline.label(class="form-label") }}
+      {{ form.response_deadline(class="form-control", type="date") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.priority.label(class="form-label") }}
+      {{ form.priority(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.department_id.label(class="form-label") }}
+      {{ form.department_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.team_id.label(class="form-label") }}
+      {{ form.team_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.responsible_user_id.label(class="form-label") }}
+      {{ form.responsible_user_id(class="form-select") }}
+    </div>
+    <div class="col-md-3">
+      {{ form.status.label(class="form-label") }}
+      {{ form.status(class="form-select") }}
+    </div>
+    <div class="col-12">
+      {{ form.notes.label(class="form-label") }}
+      {{ form.notes(class="form-control", rows=3) }}
+    </div>
+  </div>
+  <div class="mt-4">
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('correspondence.correspondence_list') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="mb-1">{{ task.title }}
+      <span class="badge badge-priority-{{ task.priority }}">{{ task.priority }}</span>
+      <span class="badge badge-status-{{ task.status|replace(' ', '') }}">{{ task.status }}</span>
+      {% if task.is_overdue %}<span class="badge bg-danger">Overdue</span>{% endif %}
+    </h4>
+    <div class="text-muted">{{ task.cooperative_day.name }} &middot; {{ task.team.name if task.team else 'No team' }} &middot; {{ task.department.name if task.department else 'No department' }}</div>
+  </div>
+  <a href="{{ url_for('tasks.task_edit', task_id=task.id) }}" class="btn btn-outline-secondary">Edit</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ task.assigned_user.full_name if task.assigned_user else 'Unassigned' }}</div><div class="stat-label">Assigned To</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ task.due_date.strftime('%Y-%m-%d') if task.due_date else '—' }}</div><div class="stat-label">Due Date</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ task.percent_complete }}%</div><div class="stat-label">Progress</div></div></div></div>
+  <div class="col-md-3"><div class="card card-stat"><div class="card-body"><div class="stat-value">{{ task.created_by.full_name if task.created_by else '—' }}</div><div class="stat-label">Created By</div></div></div></div>
+</div>
+
+{% if task.description %}<div class="card mb-4"><div class="card-body">{{ task.description }}</div></div>{% endif %}
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Quick Status</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    {% for s in ['Not Started', 'In Progress', 'Waiting', 'Completed', 'Cancelled'] %}
+    <form method="POST" action="{{ url_for('tasks.task_quick_status', task_id=task.id, new_status=s) }}">
+      <button class="btn btn-sm {% if task.status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ s }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+
+{% if task.instructions.count() or task.documents.count() %}
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Linked Records</div>
+  <div class="card-body">
+    {% if task.instructions.count() %}
+    <div class="mb-2"><strong>Instructions:</strong>
+      {% for i in task.instructions %}<a href="{{ url_for('instructions.instruction_detail', instruction_id=i.id) }}" class="badge bg-light text-dark border me-1">{{ i.title }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if task.documents.count() %}
+    <div><strong>Documents:</strong>
+      {% for d in task.documents %}<a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="badge bg-light text-dark border me-1">{{ d.title }}</a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header bg-white fw-bold">Comments</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('tasks.task_comment_add', task_id=task.id) }}" class="mb-4">
+      {{ comment_form.hidden_tag() }}
+      {{ comment_form.comment(class="form-control mb-2", rows=2) }}
+      {{ comment_form.submit(class="btn btn-primary btn-sm") }}
+    </form>
+    {% for c in comments %}
+      <div class="border-bottom pb-2 mb-2">
+        <div class="small text-muted">{{ c.user.full_name }} &middot; {{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div>{{ c.comment }}</div>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">No comments yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

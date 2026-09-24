@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Annual Reports{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Annual Reports</h4>
+    <div class="text-muted small">One living report per Cooperative Day year — figures update automatically as records change.</div>
+  </div>
+  <a href="{{ url_for('reports.compare') }}" class="btn btn-outline-primary"><i class="bi bi-bar-chart-steps me-1"></i>Compare Years</a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Year</th><th>Cooperative Day</th><th>Theme</th><th>Event Status</th>
+          <th>Report Status</th><th>Prepared By</th><th>Last Updated</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        {% set r = reports_by_event.get(e.id) %}
+        <tr>
+          <td class="fw-bold">{{ e.year }}</td>
+          <td>{{ e.name }}</td>
+          <td>{{ e.theme or '—' }}</td>
+          <td><span class="badge badge-status-{{ e.status }}">{{ e.status }}</span></td>
+          <td>
+            {% if r %}
+              <span class="badge badge-status-{{ r.status|replace(' ', '') }}">{{ r.status }}</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">Not Started</span>
+            {% endif %}
+          </td>
+          <td>{{ r.prepared_by.full_name if r and r.prepared_by else '—' }}</td>
+          <td class="small text-muted">{{ r.updated_at.strftime('%Y-%m-%d') if r and r.updated_at else '—' }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('reports.report_detail', event_id=e.id) }}" class="btn btn-sm btn-outline-secondary">View Report</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No Cooperative Day events yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
