@@ -16,19 +16,52 @@
 {% endif %}
 
 <div class="card mb-4">
-  <div class="card-header bg-white fw-bold">Team Members</div>
+  <div class="card-header bg-white fw-bold">Window Leaders &amp; Staff</div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead><tr><th>#</th><th>Name</th><th>Added</th><th></th></tr></thead>
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>#</th><th>Leader</th><th>Window</th><th>Staff</th><th></th></tr></thead>
       <tbody>
-      {% for m in team.members %}
+      {% for m in members %}
         <tr>
           <td>{{ loop.index }}</td>
-          <td>{{ m.display_name }}</td>
-          <td>{{ m.joined_at.strftime('%Y-%m-%d') }}</td>
+          <td class="fw-semibold">{{ m.display_name }}</td>
+          <td>
+            {% if can_manage_members %}
+            <form method="POST" action="{{ url_for('teams.team_member_window', team_id=team.id, member_id=m.id) }}" class="d-flex gap-1">
+              {{ member_form.hidden_tag() }}
+              <input type="text" name="window_label" value="{{ m.window_label or '' }}" placeholder="Window 1" maxlength="80" class="form-control form-control-sm" style="max-width:140px;">
+              <button class="btn btn-sm btn-outline-secondary">Save</button>
+            </form>
+            {% else %}{{ m.window_label or '—' }}{% endif %}
+          </td>
+          <td>
+            {% for s in m.staff|sort(attribute='id') %}
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span>{{ s.display_name }}</span>
+                {% if can_manage_members %}
+                <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=s.id) }}" onsubmit="return confirm('Remove this staff member?');">
+                  {{ member_form.hidden_tag() }}
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Remove">&#10005;</button>
+                </form>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="text-muted">No staff yet</span>
+            {% endfor %}
+            {% if can_manage_members %}
+            <details class="mt-2">
+              <summary class="text-primary" style="cursor:pointer;">+ Add staff</summary>
+              <form method="POST" action="{{ url_for('teams.team_staff_add', team_id=team.id, member_id=m.id) }}" class="mt-2">
+                {{ member_form.hidden_tag() }}
+                <textarea name="names" rows="3" class="form-control form-control-sm" placeholder="One staff name per line" required></textarea>
+                <button class="btn btn-sm btn-primary mt-2">Add staff</button>
+              </form>
+            </details>
+            {% endif %}
+          </td>
           <td class="text-end">
             {% if can_manage_members %}
-            <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this member?');">
+            <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this leader and all their staff?');">
               {{ member_form.hidden_tag() }}
               <button class="btn btn-sm btn-outline-danger">Remove</button>
             </form>
@@ -36,7 +69,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-4">No members yet.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted py-4">No members yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -72,14 +105,14 @@
 
 {% if can_manage_members %}
 <div class="card">
-  <div class="card-header bg-white fw-bold">Add Team Members</div>
+  <div class="card-header bg-white fw-bold">Add Window Leaders / Members</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
       <div class="mb-3">
         {{ member_form.names.label(class="form-label") }}
         {{ member_form.names(class="form-control", rows=6, placeholder="Abebe Kebede\nTigist Alemu\nDawit Bekele") }}
-        <div class="form-text">Members do not need an account. Write one full name per line.</div>
+        <div class="form-text">Members do not need an account. Write one full name per line. After adding, set their Window and add staff under each one in the table above.</div>
       </div>
       {{ member_form.submit(class="btn btn-primary") }}
     </form>

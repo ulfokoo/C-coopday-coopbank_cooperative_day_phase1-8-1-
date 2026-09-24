@@ -22,6 +22,12 @@ class BaseConfig:
         )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Prevents "server closed the connection unexpectedly" on hosted Postgres
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,   # test connection before using it
+        "pool_recycle": 280,     # replace connections older than ~5 minutes
+    }
+
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(basedir, "uploads"))
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH_MB", 25)) * 1024 * 1024
     ALLOWED_EXTENSIONS = {

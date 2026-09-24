@@ -6,7 +6,7 @@ from app.models.team import Team, TeamMember
 from app.models.document import Document
 from app.models.event import CooperativeDay
 from app.models.user import User
-from app.teams.forms import TeamForm, TeamMemberForm
+from app.teams.forms import TeamForm, TeamMemberForm, WindowForm
 from app.utils.decorators import permission_required
 from app.utils.audit import log_action
 
@@ -76,9 +76,11 @@ def team_detail(team_id):
         abort(403)
     member_form = TeamMemberForm()
     documents = Document.query.filter_by(team_id=team.id).order_by(Document.created_at.desc()).all()
+    members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
     return render_template(
         "teams/detail.html",
         team=team,
+        members=members,
         documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
@@ -149,6 +151,49 @@ def team_member_remove(team_id, member_id):
     flash("Member removed from team.", "info")
     return redirect(url_for("teams.team_detail", team_id=team_id))
 
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/window", methods=["POST"])
+@login_required
+def team_member_window(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+    form = WindowForm()
+    if form.validate_on_submit():
+        member.window_label = (form.window_label.data or "").strip() or None
+        log_action("update", "TeamMember", member.id, f"Set window for {member.display_name}")
+        db.session.commit()
+        flash("Window saved.", "success")
+    return redirect(url_for("teams.team_detail", team_id=team_id))
+
+
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/staff/add", methods=["POST"])
+@login_required
+def team_staff_add(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    leader = TeamMember.query.filter_by(id=member_id, team_id=team_id, parent_id=None).first_or_404()
+    form = TeamMemberForm()
+    if form.validate_on_submit():
+        existing = {(m.member_name or "").strip().lower() for m in team.members}
+        added = 0
+        for line in form.names.data.splitlines():
+            name = line.strip()
+            if not name or name.lower() in existing:
+                continue
+            db.session.add(TeamMember(
+                team_id=team.id, parent_id=leader.id,
+                member_name=name[:150], role_in_team="Staff",
+            ))
+            existing.add(name.lower())
+            added += 1
+        log_action("create", "TeamMember", leader.id, f"Added {added} staff under {leader.display_name}")
+        db.session.commit()
+        flash(f"{added} staff added under {leader.display_name}.", "success")
+    else:
+        flash("Please write at least one name.", "danger")
+    return redirect(url_for("teams.team_detail", team_id=team_id))
 
 def _populate_choices(form):
     form.cooperative_day_id.choices = [

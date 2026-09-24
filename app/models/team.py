@@ -46,6 +46,15 @@ class TeamMember(db.Model):
     role_in_team = db.Column(db.String(80), default="Member")
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Window leader / staff structure
+    window_label = db.Column(db.String(80))  # e.g. "Window 1"
+    parent_id = db.Column(db.Integer, db.ForeignKey("team_members.id"))  # set = this person is staff under a leader
+    staff = db.relationship(
+        "TeamMember",
+        backref=db.backref("leader", remote_side=[id]),
+        cascade="all, delete-orphan",
+    )
+
     @property
     def display_name(self):
         if self.member_name:

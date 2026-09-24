@@ -22,3 +22,8 @@ class TeamMemberForm(FlaskForm):
         validators=[DataRequired(message="Please write at least one name.")],
     )
     submit = SubmitField("Add Members")
+
+
+
+class WindowForm(FlaskForm):
+    window_label = StringField("Window", validators=[Optional(), Length(max=80)])
