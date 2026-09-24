@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models.team import Team, TeamMember
+from app.models.team import Team, TeamMember, WINDOW_SECTIONS
 from app.models.document import Document
 from app.models.event import CooperativeDay
 from app.models.user import User
@@ -15,12 +15,30 @@ from app.utils.audit import log_action
 teams_bp = Blueprint("teams", __name__)
 
 
+def _uses_windows(team):
+    """Only the Invitation / Registration / Per-diem team uses window leaders + staff."""
+    return "invitation" in (team.name or "").lower()
+
+
+def _section_query(team, section):
+    """Top-level leaders of one section. Older leaders with no section count as the first one."""
+    query = team.members.filter_by(parent_id=None)
+    if section == WINDOW_SECTIONS[0]:
+        return query.filter(db.or_(TeamMember.section == section, TeamMember.section.is_(None)))
+    return query.filter(TeamMember.section == section)
+
+
 def _window_sort_key(member):
     """Sort by the number in the window label (Window 2 before Window 10).
     Members with no window go last."""
     match = re.search(r"\d+", member.window_label or "")
     number = int(match.group()) if match else 10**9
     return (number, (member.window_label or "").lower(), member.id)
+
+
+def _back(team_id, section=None):
+    return redirect(url_for("teams.team_detail", team_id=team_id, section=section))
+
 
 def _is_team_manager(team):
     """Admin (manage_teams permission) OR the leader of this very team."""
@@ -85,15 +103,25 @@ def team_detail(team_id):
         abort(403)
     member_form = TeamMemberForm()
     documents = Document.query.filter_by(team_id=team.id).order_by(Document.created_at.desc()).all()
-    members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
-    use_windows = "invitation" in (team.name or "").lower()
+
+    use_windows = _uses_windows(team)
+    current_section = None
     if use_windows:
+        current_section = request.args.get("section")
+        if current_section not in WINDOW_SECTIONS:
+            current_section = WINDOW_SECTIONS[0]
+        members = _section_query(team, current_section).order_by(TeamMember.id).all()
         members.sort(key=_window_sort_key)
+    else:
+        members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
+
     return render_template(
         "teams/detail.html",
         team=team,
         members=members,
         use_windows=use_windows,
+        sections=WINDOW_SECTIONS,
+        current_section=current_section,
         documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
@@ -132,15 +160,23 @@ def team_member_add(team_id):
     team = Team.query.get_or_404(team_id)
     if not _is_team_manager(team):
         abort(403)
+    use_windows = _uses_windows(team)
+    section = request.form.get("section")
+    if not use_windows or section not in WINDOW_SECTIONS:
+        section = None
     form = TeamMemberForm()
     if form.validate_on_submit():
-        existing = {(m.member_name or "").strip().lower() for m in team.members}
+        pool = _section_query(team, section) if section else team.members
+        existing = {(m.member_name or "").strip().lower() for m in pool}
         added = 0
         for line in form.names.data.splitlines():
             name = line.strip()
             if not name or name.lower() in existing:
                 continue
-            db.session.add(TeamMember(team_id=team.id, member_name=name[:150], role_in_team="Member"))
+            db.session.add(TeamMember(
+                team_id=team.id, member_name=name[:150],
+                role_in_team="Member", section=section,
+            ))
             existing.add(name.lower())
             added += 1
         log_action("create", "TeamMember", team.id, f"Added {added} member(s) to team {team.name}")
@@ -148,7 +184,7 @@ def team_member_add(team_id):
         flash(f"{added} member(s) added to the team.", "success")
     else:
         flash("Please write at least one name.", "danger")
-    return redirect(url_for("teams.team_detail", team_id=team.id))
+    return _back(team.id, section)
 
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/remove", methods=["POST"])
@@ -158,11 +194,14 @@ def team_member_remove(team_id, member_id):
     if not _is_team_manager(team):
         abort(403)
     member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+    root = member.leader or member
+    section = root.section if _uses_windows(team) else None
     log_action("delete", "TeamMember", member.id, f"Removed member {member.display_name} from team {team_id}")
     db.session.delete(member)
     db.session.commit()
     flash("Member removed from team.", "info")
-    return redirect(url_for("teams.team_detail", team_id=team_id))
+    return _back(team_id, section)
+
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/window", methods=["POST"])
 @login_required
@@ -177,7 +216,7 @@ def team_member_window(team_id, member_id):
         log_action("update", "TeamMember", member.id, f"Set window for {member.display_name}")
         db.session.commit()
         flash("Window saved.", "success")
-    return redirect(url_for("teams.team_detail", team_id=team_id))
+    return _back(team_id, member.section)
 
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/staff/add", methods=["POST"])
@@ -206,7 +245,8 @@ def team_staff_add(team_id, member_id):
         flash(f"{added} staff added under {leader.display_name}.", "success")
     else:
         flash("Please write at least one name.", "danger")
-    return redirect(url_for("teams.team_detail", team_id=team_id))
+    return _back(team_id, leader.section)
+
 
 def _populate_choices(form):
     form.cooperative_day_id.choices = [

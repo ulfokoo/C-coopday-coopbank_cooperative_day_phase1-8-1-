@@ -16,9 +16,18 @@
 {% endif %}
 
 {% if use_windows %}
-{# ===== Invitation team: window leaders with staff under them ===== #}
+{# ===== Invitation / Registration / Per-diem: one clickable link each ===== #}
+<ul class="nav nav-pills mb-3">
+  {% for s in sections %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if s == current_section else '' }}"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section=s) }}">{{ s }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
 <div class="card mb-4">
-  <div class="card-header bg-white fw-bold">Window Leaders &amp; Staff</div>
+  <div class="card-header bg-white fw-bold">{{ current_section }} &mdash; Window Leaders &amp; Staff</div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>#</th><th>Leader</th><th>Window</th><th>Staff</th><th></th></tr></thead>
@@ -71,7 +80,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No members yet.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted py-4">No window leaders in {{ current_section }} yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -137,10 +146,11 @@
 
 {% if can_manage_members %}
 <div class="card">
-  <div class="card-header bg-white fw-bold">{{ 'Add Window Leaders' if use_windows else 'Add Team Members' }}</div>
+  <div class="card-header bg-white fw-bold">{{ ('Add Window Leaders to ' ~ current_section) if use_windows else 'Add Team Members' }}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
+      {% if use_windows %}<input type="hidden" name="section" value="{{ current_section }}">{% endif %}
       <div class="mb-3">
         {{ member_form.names.label(class="form-label") }}
         {{ member_form.names(class="form-control", rows=6, placeholder="Abebe Kebede\nTigist Alemu\nDawit Bekele") }}
