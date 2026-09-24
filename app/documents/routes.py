@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, abort
+from flask import Blueprint, app, render_template, redirect, url_for, flash, request, send_from_directory, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -19,6 +19,7 @@ from app.utils.decorators import permission_required
 from app.utils.audit import log_action
 from app.utils.files import allowed_file, safe_stored_filename, upload_path
 from app.utils.notifications import notify_users_with_permission
+from app.utils.team_scope import restrict_query, can_access, team_choices
 
 documents_bp = Blueprint("documents", __name__)
 
@@ -34,7 +35,7 @@ def documents_list():
     status = request.args.get("status", "")
     keyword = request.args.get("q", "").strip()
 
-    query = Document.query
+    query = restrict_query(Document.query, Document)
     if event_id:
         query = query.filter_by(cooperative_day_id=event_id)
     if document_type:
@@ -69,9 +70,11 @@ def documents_list():
 @login_required
 @permission_required("upload_documents")
 def document_new():
-    form = DocumentUploadForm()
-    _populate_choices(form)
-    if form.validate_on_submit():
+      form = DocumentUploadForm()
+      _populate_choices(form)
+      if request.method == "GET" and request.args.get("team_id", type=int):
+          form.team_id.data = request.args.get("team_id", type=int)
+      if form.validate_on_submit():
         upload = form.file.data
         if not allowed_file(upload.filename):
             flash("That file type is not allowed.", "danger")
@@ -118,6 +121,8 @@ def document_new():
 @permission_required("view_documents")
 def document_detail(document_id):
     doc = Document.query.get_or_404(document_id)
+    if not can_access(doc):
+        abort(403)
     version_form = DocumentVersionForm()
     versions = doc.versions.order_by(DocumentVersion.version_number.desc()).all()
     return render_template("documents/detail.html", document=doc, versions=versions, version_form=version_form)
@@ -128,6 +133,8 @@ def document_detail(document_id):
 @permission_required("upload_documents")
 def document_edit(document_id):
     doc = Document.query.get_or_404(document_id)
+    if not can_access(doc):
+          abort(403)
     form = DocumentMetadataForm(obj=doc)
     _populate_choices(form)
     if request.method == "GET":
@@ -167,6 +174,8 @@ def document_edit(document_id):
 @permission_required("upload_documents")
 def document_version_new(document_id):
     doc = Document.query.get_or_404(document_id)
+    if not can_access(doc):
+          abort(403)
     form = DocumentVersionForm()
     if form.validate_on_submit():
         upload = form.file.data
@@ -195,6 +204,8 @@ def document_version_new(document_id):
 @permission_required("approve_documents")
 def document_status(document_id, new_status):
     doc = Document.query.get_or_404(document_id)
+    if not can_access(doc):
+          abort(403)
     if new_status not in DOCUMENT_STATUSES:
         flash("Invalid status.", "danger")
         return redirect(url_for("documents.document_detail", document_id=doc.id))
@@ -266,7 +277,7 @@ def _populate_choices(form):
     form.department_id.choices = [(0, "— None —")] + [
         (d.id, d.name) for d in Department.query.filter_by(is_active=True).order_by(Department.name)
     ]
-    form.team_id.choices = [(0, "— None —")] + [(t.id, t.name) for t in Team.query.order_by(Team.name)]
+    form.team_id.choices = team_choices()
     form.task_id.choices = [(0, "— None —")] + [(t.id, t.title) for t in Task.query.order_by(Task.title)]
     form.meeting_id.choices = [(0, "— None —")] + [(m.id, m.title) for m in Meeting.query.order_by(Meeting.title)]
     form.instruction_id.choices = [(0, "— None —")] + [

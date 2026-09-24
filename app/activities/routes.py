@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+  from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -9,6 +9,7 @@ from app.models.user import User
 from app.activities.forms import ActivityForm, ActivityParticipantForm
 from app.utils.decorators import permission_required
 from app.utils.audit import log_action
+from app.utils.team_scope import restrict_query, can_access, team_choices
 
 activities_bp = Blueprint("activities", __name__)
 
@@ -21,7 +22,7 @@ def activities_list():
     team_id = request.args.get("team_id", type=int)
     status = request.args.get("status", "")
 
-    query = Activity.query
+    query = restrict_query(Activity.query, Activity)
     if event_id:
         query = query.filter_by(cooperative_day_id=event_id)
     if team_id:
@@ -78,6 +79,8 @@ def activity_new():
 @permission_required("view_activities")
 def activity_detail(activity_id):
     activity = Activity.query.get_or_404(activity_id)
+    if not can_access(activity):
+        abort(403)
     participant_form = ActivityParticipantForm()
     _populate_participant_choices(participant_form, activity)
     return render_template("activities/detail.html", activity=activity, participant_form=participant_form)
@@ -88,6 +91,8 @@ def activity_detail(activity_id):
 @permission_required("manage_activities")
 def activity_edit(activity_id):
     activity = Activity.query.get_or_404(activity_id)
+    if not can_access(activity):
+        abort(403)
     form = ActivityForm(obj=activity)
     _populate_choices(form)
     if request.method == "GET":
@@ -120,6 +125,8 @@ def activity_edit(activity_id):
 @permission_required("manage_activities")
 def activity_status(activity_id, new_status):
     activity = Activity.query.get_or_404(activity_id)
+    if not can_access(activity):
+        abort(403)
     if new_status not in ACTIVITY_STATUSES:
         flash("Invalid status.", "danger")
         return redirect(url_for("activities.activity_detail", activity_id=activity.id))
@@ -135,6 +142,8 @@ def activity_status(activity_id, new_status):
 @permission_required("manage_activities")
 def participant_add(activity_id):
     activity = Activity.query.get_or_404(activity_id)
+    if not can_access(activity):
+        abort(403)
     form = ActivityParticipantForm()
     _populate_participant_choices(form, activity)
     if form.validate_on_submit():
@@ -174,7 +183,7 @@ def _populate_choices(form):
     form.cooperative_day_id.choices = [
         (e.id, e.name) for e in CooperativeDay.query.order_by(CooperativeDay.year.desc())
     ]
-    form.team_id.choices = [(0, "— None —")] + [(t.id, t.name) for t in Team.query.order_by(Team.name)]
+    form.team_id.choices = team_choices()
     form.responsible_user_id.choices = [(0, "— None —")] + [
         (u.id, u.full_name) for u in User.query.filter_by(status="Active").order_by(User.full_name)
     ]

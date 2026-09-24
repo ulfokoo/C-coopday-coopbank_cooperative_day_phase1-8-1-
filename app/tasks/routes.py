@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+  from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -13,6 +13,7 @@ from app.tasks.forms import TaskForm, TaskCommentForm
 from app.utils.decorators import permission_required
 from app.utils.audit import log_action
 from app.utils.notifications import notify
+from app.utils.team_scope import restrict_query, can_access, team_choices
 
 tasks_bp = Blueprint("tasks", __name__)
 
@@ -28,7 +29,7 @@ def tasks_list():
     assigned_user_id = request.args.get("assigned_user_id", type=int)
     keyword = request.args.get("q", "").strip()
 
-    query = Task.query
+    query = restrict_query(Task.query, Task)
     if event_id:
         query = query.filter_by(cooperative_day_id=event_id)
     if team_id:
@@ -101,6 +102,8 @@ def task_new():
 @permission_required("manage_tasks")
 def task_detail(task_id):
     task = Task.query.get_or_404(task_id)
+    if not can_access(task):
+          abort(403)
     comment_form = TaskCommentForm()
     comments = task.comments.order_by(TaskComment.created_at.desc()).all()
     return render_template("tasks/detail.html", task=task, comment_form=comment_form, comments=comments)
@@ -111,6 +114,8 @@ def task_detail(task_id):
 @permission_required("manage_tasks")
 def task_edit(task_id):
     task = Task.query.get_or_404(task_id)
+    if not can_access(task):
+          abort(403)
     form = TaskForm(obj=task)
     _populate_choices(form)
     if request.method == "GET":
@@ -154,6 +159,8 @@ def task_edit(task_id):
 @permission_required("manage_tasks")
 def task_comment_add(task_id):
     task = Task.query.get_or_404(task_id)
+    if not can_access(task):
+          abort(403)
     form = TaskCommentForm()
     if form.validate_on_submit():
         comment = TaskComment(task_id=task.id, user_id=current_user.id, comment=form.comment.data)
@@ -174,6 +181,8 @@ def task_quick_status(task_id, new_status):
     from app.models.task import TASK_STATUSES
 
     task = Task.query.get_or_404(task_id)
+    if not can_access(task):
+        abort(403)
     if new_status not in TASK_STATUSES:
         flash("Invalid status.", "danger")
         return redirect(url_for("tasks.task_detail", task_id=task.id))
@@ -193,9 +202,7 @@ def _populate_choices(form):
     form.department_id.choices = [(0, "— None —")] + [
         (d.id, d.name) for d in Department.query.filter_by(is_active=True).order_by(Department.name)
     ]
-    form.team_id.choices = [(0, "— None —")] + [
-        (t.id, t.name) for t in Team.query.order_by(Team.name)
-    ]
+    form.team_id.choices = team_choices()
     form.assigned_user_id.choices = [(0, "— Unassigned —")] + [
         (u.id, u.full_name) for u in User.query.filter_by(status="Active").order_by(User.full_name)
     ]

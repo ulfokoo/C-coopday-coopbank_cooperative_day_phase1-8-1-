@@ -40,9 +40,17 @@ class TeamMember(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     team_id = db.Column(db.Integer, db.ForeignKey("teams.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    role_in_team = db.Column(db.String(80), default="Member")  # e.g. Member, Deputy Leader
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))  # optional: members need no account
+    member_name = db.Column(db.String(150))                      # name typed in by the team leader
+    phone = db.Column(db.String(30))
+    role_in_team = db.Column(db.String(80), default="Member")
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def display_name(self):
+        if self.member_name:
+            return self.member_name
+        return self.user.full_name if self.user else "—"
 
     def __repr__(self):
         return f"<TeamMember team={self.team_id} user={self.user_id}>"

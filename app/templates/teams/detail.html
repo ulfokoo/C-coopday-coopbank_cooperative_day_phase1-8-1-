@@ -19,13 +19,12 @@
   <div class="card-header bg-white fw-bold">Team Members</div>
   <div class="table-responsive">
     <table class="table table-hover mb-0">
-      <thead><tr><th>Name</th><th>Role in Team</th><th>Department</th><th>Joined</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Name</th><th>Added</th><th></th></tr></thead>
       <tbody>
       {% for m in team.members %}
         <tr>
-          <td>{{ m.user.full_name }}</td>
-          <td>{{ m.role_in_team }}</td>
-          <td>{{ m.user.department.name if m.user.department else '—' }}</td>
+          <td>{{ loop.index }}</td>
+          <td>{{ m.display_name }}</td>
           <td>{{ m.joined_at.strftime('%Y-%m-%d') }}</td>
           <td class="text-end">
             {% if can_manage_members %}
@@ -37,7 +36,34 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No members yet.</td></tr>
+        <tr><td colspan="4" class="text-center text-muted py-4">No members yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+    <span>Agreed Documents &amp; Uploads</span>
+    {% if can_manage_members and user_has_permission('upload_documents') %}
+    <a href="{{ url_for('documents.document_new', team_id=team.id) }}" class="btn btn-sm btn-primary">Upload Document</a>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Uploaded</th><th></th></tr></thead>
+      <tbody>
+      {% for d in documents %}
+        <tr>
+          <td>{{ d.title }}</td>
+          <td>{{ d.document_type }}</td>
+          <td>{{ d.status }}</td>
+          <td>{{ d.created_at.strftime('%Y-%m-%d') }}</td>
+          <td class="text-end"><a href="{{ url_for('documents.document_detail', document_id=d.id) }}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Nothing uploaded yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -46,21 +72,16 @@
 
 {% if can_manage_members %}
 <div class="card">
-  <div class="card-header bg-white fw-bold">Add Staff to this Team</div>
+  <div class="card-header bg-white fw-bold">Add Team Members</div>
   <div class="card-body">
-    <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}" class="row g-2 align-items-end">
+    <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
-      <div class="col-md-6">
-        {{ member_form.user_id.label(class="form-label") }}
-        {{ member_form.user_id(class="form-select") }}
+      <div class="mb-3">
+        {{ member_form.names.label(class="form-label") }}
+        {{ member_form.names(class="form-control", rows=6, placeholder="Abebe Kebede\nTigist Alemu\nDawit Bekele") }}
+        <div class="form-text">Members do not need an account. Write one full name per line.</div>
       </div>
-      <div class="col-md-4">
-        {{ member_form.role_in_team.label(class="form-label") }}
-        {{ member_form.role_in_team(class="form-control") }}
-      </div>
-      <div class="col-md-2">
-        {{ member_form.submit(class="btn btn-primary w-100") }}
-      </div>
+      {{ member_form.submit(class="btn btn-primary") }}
     </form>
   </div>
 </div>

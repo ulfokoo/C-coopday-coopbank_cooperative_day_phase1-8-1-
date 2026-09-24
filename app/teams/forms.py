@@ -17,6 +17,8 @@ class TeamForm(FlaskForm):
 
 
 class TeamMemberForm(FlaskForm):
-    user_id = SelectField("Staff Member", coerce=int, validators=[DataRequired()])
-    role_in_team = StringField("Role in Team", default="Member", validators=[Optional(), Length(max=80)])
-    submit = SubmitField("Add Member")
+    names = TextAreaField(
+        "Member names (one name per line)",
+        validators=[DataRequired(message="Please write at least one name.")],
+    )
+    submit = SubmitField("Add Members")

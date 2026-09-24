@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.models.team import Team, TeamMember
+from app.models.document import Document
 from app.models.event import CooperativeDay
 from app.models.user import User
 from app.teams.forms import TeamForm, TeamMemberForm
@@ -74,10 +75,11 @@ def team_detail(team_id):
     if not _is_team_viewer(team):
         abort(403)
     member_form = TeamMemberForm()
-    _populate_member_choices(member_form, team)
+    documents = Document.query.filter_by(team_id=team.id).order_by(Document.created_at.desc()).all()
     return render_template(
         "teams/detail.html",
         team=team,
+        documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
         can_edit_team=current_user.has_permission("manage_teams"),
@@ -116,22 +118,21 @@ def team_member_add(team_id):
     if not _is_team_manager(team):
         abort(403)
     form = TeamMemberForm()
-    _populate_member_choices(form, team)
     if form.validate_on_submit():
-        exists = TeamMember.query.filter_by(team_id=team.id, user_id=form.user_id.data).first()
-        if exists:
-            flash("That staff member is already on this team.", "warning")
-        else:
-            member = TeamMember(
-                team_id=team.id, user_id=form.user_id.data, role_in_team=form.role_in_team.data or "Member"
-            )
-            db.session.add(member)
-            db.session.flush()
-            log_action("create", "TeamMember", member.id, f"Added user {member.user_id} to team {team.id}")
-            db.session.commit()
-            flash("Member added to team.", "success")
+        existing = {(m.member_name or "").strip().lower() for m in team.members}
+        added = 0
+        for line in form.names.data.splitlines():
+            name = line.strip()
+            if not name or name.lower() in existing:
+                continue
+            db.session.add(TeamMember(team_id=team.id, member_name=name[:150], role_in_team="Member"))
+            existing.add(name.lower())
+            added += 1
+        log_action("create", "TeamMember", team.id, f"Added {added} member(s) to team {team.name}")
+        db.session.commit()
+        flash(f"{added} member(s) added to the team.", "success")
     else:
-        flash("Could not add member — please pick a staff member.", "danger")
+        flash("Please write at least one name.", "danger")
     return redirect(url_for("teams.team_detail", team_id=team.id))
 
 
@@ -142,7 +143,7 @@ def team_member_remove(team_id, member_id):
     if not _is_team_manager(team):
         abort(403)
     member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
-    log_action("delete", "TeamMember", member.id, f"Removed user {member.user_id} from team {team_id}")
+    log_action("delete", "TeamMember", member.id, f"Removed member {member.display_name} from team {team_id}")
     db.session.delete(member)
     db.session.commit()
     flash("Member removed from team.", "info")
@@ -155,13 +156,4 @@ def _populate_choices(form):
     ]
     form.leader_id.choices = [(0, "— None —")] + [
         (u.id, u.full_name) for u in User.query.filter_by(status="Active").order_by(User.full_name)
-    ]
-
-
-def _populate_member_choices(form, team):
-    existing_ids = [m.user_id for m in team.members]
-    form.user_id.choices = [
-        (u.id, f"{u.full_name} ({u.username})")
-        for u in User.query.filter_by(status="Active").order_by(User.full_name)
-        if u.id not in existing_ids and u.id != team.leader_id
     ]

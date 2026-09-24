@@ -33,7 +33,8 @@ def build_report_context(event):
     staff_ids = set()
     if team_ids:
         for row in TeamMember.query.filter(TeamMember.team_id.in_(team_ids)).with_entities(TeamMember.user_id):
-            staff_ids.add(row[0])
+            if row[0]:
+                staff_ids.add(row[0])
     for model, col in [
         (Task, "assigned_user_id"), (Instruction, "responsible_user_id"),
         (Activity, "responsible_user_id"), (Communication, "responsible_user_id"),
