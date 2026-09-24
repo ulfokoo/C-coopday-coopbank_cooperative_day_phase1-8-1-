@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, app, render_template, redirect, url_for, flash, request, send_from_directory, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, abort
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -70,11 +70,11 @@ def documents_list():
 @login_required
 @permission_required("upload_documents")
 def document_new():
-      form = DocumentUploadForm()
-      _populate_choices(form)
-      if request.method == "GET" and request.args.get("team_id", type=int):
-          form.team_id.data = request.args.get("team_id", type=int)
-      if form.validate_on_submit():
+    form = DocumentUploadForm()
+    _populate_choices(form)
+    if request.method == "GET" and request.args.get("team_id", type=int):
+        form.team_id.data = request.args.get("team_id", type=int)
+    if form.validate_on_submit():
         upload = form.file.data
         if not allowed_file(upload.filename):
             flash("That file type is not allowed.", "danger")
@@ -134,7 +134,7 @@ def document_detail(document_id):
 def document_edit(document_id):
     doc = Document.query.get_or_404(document_id)
     if not can_access(doc):
-          abort(403)
+        abort(403)
     form = DocumentMetadataForm(obj=doc)
     _populate_choices(form)
     if request.method == "GET":
@@ -175,7 +175,7 @@ def document_edit(document_id):
 def document_version_new(document_id):
     doc = Document.query.get_or_404(document_id)
     if not can_access(doc):
-          abort(403)
+        abort(403)
     form = DocumentVersionForm()
     if form.validate_on_submit():
         upload = form.file.data
@@ -204,8 +204,6 @@ def document_version_new(document_id):
 @permission_required("approve_documents")
 def document_status(document_id, new_status):
     doc = Document.query.get_or_404(document_id)
-    if not can_access(doc):
-          abort(403)
     if new_status not in DOCUMENT_STATUSES:
         flash("Invalid status.", "danger")
         return redirect(url_for("documents.document_detail", document_id=doc.id))
@@ -222,6 +220,8 @@ def document_status(document_id, new_status):
 def version_download(version_id):
     version = DocumentVersion.query.get_or_404(version_id)
     doc = version.document
+    if not can_access(doc):
+        abort(403)
 
     folder = upload_path("documents", str(doc.cooperative_day_id))
     file_on_disk = os.path.join(folder, version.stored_filename)
