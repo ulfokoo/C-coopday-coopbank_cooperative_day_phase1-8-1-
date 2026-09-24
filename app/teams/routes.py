@@ -246,6 +246,89 @@ def team_export_excel(team_id):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
+@teams_bp.route("/<int:team_id>/import.xlsx", methods=["POST"])
+@login_required
+def team_import_excel(team_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+
+    use_windows = _uses_windows(team)
+    if not use_windows:
+        abort(404)
+
+    section = request.form.get("section") or request.args.get("section")
+    if section not in WINDOW_SECTIONS:
+        section = WINDOW_SECTIONS[0]
+
+    file = request.files.get("excel_file")
+    if not file or not file.filename:
+        flash("Choose an Excel file to upload.", "danger")
+        return _back(team.id, section)
+    if not file.filename.lower().endswith(".xlsx"):
+        flash("Please upload a .xlsx file.", "danger")
+        return _back(team.id, section)
+
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+    except Exception:
+        flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
+        return _back(team.id, section)
+
+    groups = []
+    current = None
+    for row in ws.iter_rows(min_row=4):
+        leader_cell = row[1].value if len(row) > 1 else None
+        window_cell = row[2].value if len(row) > 2 else None
+        staff_cell = row[3].value if len(row) > 3 else None
+        action_cell = row[4].value if len(row) > 4 else None
+
+        if leader_cell not in (None, ""):
+            current = {
+                "leader": str(leader_cell).strip(),
+                "window": (str(window_cell).strip() if window_cell not in (None, "") else ""),
+                "action": (str(action_cell).strip() if action_cell not in (None, "") else ""),
+                "staff": [],
+            }
+            groups.append(current)
+
+        if current is None:
+            continue
+
+        staff_name = str(staff_cell).strip() if staff_cell not in (None, "") else ""
+        if staff_name and staff_name.lower() != "no staff yet":
+            current["staff"].append(staff_name)
+
+    if not groups:
+        flash("No rows found in that file.", "warning")
+        return _back(team.id, section)
+
+    # Replace this section's leaders + staff with what's in the uploaded file.
+    existing = _section_query(team, section).all()
+    for m in existing:
+        db.session.delete(m)
+    db.session.flush()
+
+    for g in groups:
+        leader = TeamMember(
+            team_id=team.id,
+            member_name=g["leader"].rstrip(","),
+            window_label=g["window"] or None,
+            action_note=g["action"] or None,
+            section=section,
+        )
+        db.session.add(leader)
+        db.session.flush()
+        for name in g["staff"]:
+            db.session.add(TeamMember(team_id=team.id, member_name=name, parent_id=leader.id))
+
+    log_action("update", "Team", team.id, f"Imported {section} roster from Excel ({len(groups)} leaders)")
+    db.session.commit()
+    flash(f"Imported {len(groups)} leader(s) into {section}.", "success")
+    return _back(team.id, section)
+
 
 @teams_bp.route("/<int:team_id>/export.pdf")
 @login_required
