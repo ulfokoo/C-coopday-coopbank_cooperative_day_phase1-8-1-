@@ -71,19 +71,6 @@
             {% else %}
               <span class="text-muted staff-empty-hint">No staff yet</span>
             {% endfor %}
-            {% for s in m.staff|sort(attribute='id') %}
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span>{{ s.display_name }}</span>
-                {% if can_manage_members %}
-                <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=s.id) }}" onsubmit="return confirm('Remove this staff member?');">
-                  {{ member_form.hidden_tag() }}
-                  <button class="btn btn-sm btn-link text-danger p-0" title="Remove">&#10005;</button>
-                </form>
-                {% endif %}
-              </div>
-            {% else %}
-              <span class="text-muted">No staff yet</span>
-            {% endfor %}
             {% if can_manage_members %}
             <details class="mt-2">
               <summary class="text-primary" style="cursor:pointer;">+ Add staff</summary>
