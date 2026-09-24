@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.models.team import Team, TeamMember
@@ -12,12 +12,29 @@ from app.utils.audit import log_action
 teams_bp = Blueprint("teams", __name__)
 
 
+def _is_team_manager(team):
+    """Admin (manage_teams permission) OR the leader of this very team."""
+    return current_user.has_permission("manage_teams") or team.leader_id == current_user.id
+
+
+def _is_team_viewer(team):
+    """Managers plus ordinary members of the team can open it."""
+    if _is_team_manager(team):
+        return True
+    return TeamMember.query.filter_by(team_id=team.id, user_id=current_user.id).first() is not None
+
+
 @teams_bp.route("/")
 @login_required
-@permission_required("manage_teams")
 def teams_list():
     event_id = request.args.get("event_id", type=int)
     query = Team.query
+    # Admins see every team; everyone else sees only teams they lead or belong to.
+    if not current_user.has_permission("manage_teams"):
+        member_team_ids = db.session.query(TeamMember.team_id).filter_by(user_id=current_user.id)
+        query = query.filter(
+            db.or_(Team.leader_id == current_user.id, Team.id.in_(member_team_ids))
+        )
     if event_id:
         query = query.filter_by(cooperative_day_id=event_id)
     teams = query.order_by(Team.cooperative_day_id.desc(), Team.name).all()
@@ -52,12 +69,19 @@ def team_new():
 
 @teams_bp.route("/<int:team_id>")
 @login_required
-@permission_required("manage_teams")
 def team_detail(team_id):
     team = Team.query.get_or_404(team_id)
+    if not _is_team_viewer(team):
+        abort(403)
     member_form = TeamMemberForm()
     _populate_member_choices(member_form, team)
-    return render_template("teams/detail.html", team=team, member_form=member_form)
+    return render_template(
+        "teams/detail.html",
+        team=team,
+        member_form=member_form,
+        can_manage_members=_is_team_manager(team),
+        can_edit_team=current_user.has_permission("manage_teams"),
+    )
 
 
 @teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
@@ -87,9 +111,10 @@ def team_edit(team_id):
 
 @teams_bp.route("/<int:team_id>/members/add", methods=["POST"])
 @login_required
-@permission_required("manage_teams")
 def team_member_add(team_id):
     team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
     form = TeamMemberForm()
     _populate_member_choices(form, team)
     if form.validate_on_submit():
@@ -112,8 +137,10 @@ def team_member_add(team_id):
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/remove", methods=["POST"])
 @login_required
-@permission_required("manage_teams")
 def team_member_remove(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
     member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
     log_action("delete", "TeamMember", member.id, f"Removed user {member.user_id} from team {team_id}")
     db.session.delete(member)
@@ -136,5 +163,5 @@ def _populate_member_choices(form, team):
     form.user_id.choices = [
         (u.id, f"{u.full_name} ({u.username})")
         for u in User.query.filter_by(status="Active").order_by(User.full_name)
-        if u.id not in existing_ids
+        if u.id not in existing_ids and u.id != team.leader_id
     ]
