@@ -72,10 +72,9 @@
           </td>
           <td>
             {% if can_manage_members %}
-            <form method="POST" action="{{ url_for('teams.team_member_action', team_id=team.id, member_id=m.id) }}" class="d-flex gap-1">
+            <form method="POST" action="{{ url_for('teams.team_member_action', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
-              <input type="text" name="action_note" value="{{ m.action_note or '' }}" placeholder="What to do today" maxlength="255" class="form-control form-control-sm" style="max-width:160px;">
-              <button class="btn btn-sm btn-outline-secondary">Save</button>
+              <input type="text" name="action_note" value="{{ m.action_note or '' }}" placeholder="What to do today" maxlength="255" class="form-control form-control-sm" style="max-width:180px;" onchange="this.form.submit()">
             </form>
             {% else %}{{ m.action_note or '—' }}{% endif %}
           </td>
