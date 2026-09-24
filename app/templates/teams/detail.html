@@ -73,7 +73,7 @@
             {% if can_manage_members %}
             <form method="POST" action="{{ url_for('teams.team_member_action', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
-              <textarea name="action_note" placeholder="What to do today" maxlength="255" rows="1" class="form-control form-control-sm action-note-box" style="width:35ch; white-space:pre-wrap; overflow:hidden; resize:none;" oninput="autoResizeActionNote(this)" onchange="this.form.submit()">{{ m.action_note or '' }}</textarea>
+              <textarea name="action_note" placeholder="What to do today" maxlength="255" rows="1" class="form-control form-control-sm action-note-box" style="width:28ch; white-space:pre-wrap; overflow:hidden; resize:none;" oninput="autoResizeActionNote(this)" onchange="this.form.submit()">{{ m.action_note or '' }}</textarea>
             </form>
             {% else %}{{ m.action_note or '—' }}{% endif %}
           </td>
