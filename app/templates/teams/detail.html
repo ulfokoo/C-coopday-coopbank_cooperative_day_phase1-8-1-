@@ -65,7 +65,7 @@
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr>
-        <th>#</th><th>Leader</th><th>Window</th><th>District</th><th>Staff</th><th>Action</th>
+        <th>#</th><th>Leader</th><th>Window</th><th>Staff</th><th>Action</th>
         {% for fname in extra_field_names %}<th>{{ fname }}</th>{% endfor %}
         <th></th>
       </tr></thead>
@@ -78,17 +78,9 @@
             {% if can_manage_members %}
             <form method="POST" action="{{ url_for('teams.team_member_window', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
-              <input type="text" name="window_label" value="{{ m.window_label or '' }}" placeholder="Window 1" maxlength="80" class="form-control form-control-sm quick-save" style="max-width:160px;">         
+              <textarea name="window_label" rows="1" placeholder="Window 1" maxlength="255" class="form-control form-control-sm window-box" style="width:24ch; white-space:pre-wrap; overflow:hidden; resize:none;" oninput="autoResizeActionNote(this)" onchange="this.form.submit()">{{ m.window_label or '' }}</textarea>
             </form>
-            {% else %}{{ m.window_label or '—' }}{% endif %}
-          </td>
-          <td>
-            {% if can_manage_members %}
-            <form method="POST" action="{{ url_for('teams.team_member_district', team_id=team.id, member_id=m.id) }}">
-              {{ member_form.hidden_tag() }}
-              <input type="text" name="district" value="{{ m.district or '' }}" placeholder="e.g. East, Adama" maxlength="120" class="form-control form-control-sm quick-save" style="max-width:160px;">
-            </form>
-            {% else %}{{ m.district or '—' }}{% endif %}
+            {% else %}<span style="white-space:pre-wrap;">{{ m.window_label or '—' }}</span>{% endif %}
           </td>
           <td class="staff-dropzone" data-leader-id="{{ m.id }}">
             {% for s in m.staff|sort(attribute='id') %}
@@ -154,7 +146,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No window leaders in {{ current_section }} yet.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">No window leaders in {{ current_section }} yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -264,7 +256,7 @@ function handleActionNoteKeydown(e) {
   }
 }
 document.addEventListener("DOMContentLoaded", function () {
-  document.querySelectorAll(".action-note-box").forEach(autoResizeActionNote);
+document.querySelectorAll(".action-note-box, .window-box").forEach(autoResizeActionNote);
 });
 
 {% if use_windows and can_manage_members %}

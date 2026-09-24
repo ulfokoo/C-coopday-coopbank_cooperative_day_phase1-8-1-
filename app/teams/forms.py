@@ -26,7 +26,7 @@ class TeamMemberForm(FlaskForm):
 
 
 class WindowForm(FlaskForm):
-    window_label = StringField("Window", validators=[Optional(), Length(max=80)])
+    window_label = StringField("Window", validators=[Optional(), Length(max=255)])
 
 
 class DistrictForm(FlaskForm):

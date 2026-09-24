@@ -8,6 +8,7 @@ def _sync_missing_columns():
     """Add columns defined in the models that are missing in the database."""
     from sqlalchemy import inspect, text
 
+    # 1) add any missing columns
     try:
         insp = inspect(db.engine)
         existing_tables = set(insp.get_table_names())
@@ -27,7 +28,17 @@ def _sync_missing_columns():
                     )
                     print(f"[db-sync] added {table.name}.{col.name}")
     except Exception as e:  # never stop the app from booting
-        print(f"[db-sync] skipped: {e}")
+        print(f"[db-sync] add columns skipped: {e}")
+
+    # 2) widen window_label to 255 (Postgres only, safe to repeat)
+    try:
+        if db.engine.dialect.name == "postgresql":
+            with db.engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE team_members ALTER COLUMN window_label TYPE VARCHAR(255)")
+                )
+    except Exception as e:
+        print(f"[db-sync] widen window_label skipped: {e}")
 
 def create_app(config_name=None):
     """Application factory."""
