@@ -38,7 +38,18 @@
 </ul>
 
 <div class="card mb-4">
-  <div class="card-header bg-white fw-bold">{{ current_section }} &mdash; Window Leaders &amp; Staff</div>
+  <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+    <span>{{ current_section }} &mdash; Window Leaders &amp; Staff</span>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-download"></i> Download
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
+      </ul>
+    </div>
+  </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>#</th><th>Leader</th><th>Window</th><th>Staff</th><th>Action</th><th></th></tr></thead>
