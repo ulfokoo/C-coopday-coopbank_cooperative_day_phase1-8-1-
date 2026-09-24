@@ -176,7 +176,7 @@ def team_export_excel(team_id):
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
-    title_text = team.name + (f" \u2014 {section}" if section else "")
+    title_text = f"{section} Team" if section else team.name
     n_cols = 5 if use_windows else 3
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
     ws.cell(row=1, column=1, value=title_text).font = title_font

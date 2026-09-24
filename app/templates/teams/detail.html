@@ -66,8 +66,7 @@
             </form>
             {% else %}{{ m.window_label or '—' }}{% endif %}
           </td>
-          <td>
-            <td class="staff-dropzone" data-leader-id="{{ m.id }}">
+          <td class="staff-dropzone" data-leader-id="{{ m.id }}">
             {% for s in m.staff|sort(attribute='id') %}
               <div class="d-flex align-items-center gap-2 mb-1 staff-chip" {% if can_manage_members %}draggable="true" data-staff-id="{{ s.id }}"{% endif %}>
                 {% if can_manage_members %}<span class="drag-handle text-muted" title="Drag to another window">&#9776;</span>{% endif %}
