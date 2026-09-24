@@ -599,6 +599,31 @@ def team_member_field(team_id, member_id):
         flash(f"'{field_name}' saved.", "success")
     return _back(team_id, member.section)
 
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/invite", methods=["POST"])
+@login_required
+def team_member_invite(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+
+    name = (request.form.get("member_name") or "").strip()
+    if name:
+        member.member_name = name[:150]
+    member.phone = (request.form.get("phone") or "").strip()[:30] or None
+
+    data = dict(member.extra_fields or {})
+    for key in ("Account", "Date", "Sign", "Day"):
+        val = (request.form.get(key) or "").strip()[:100]
+        if val:
+            data[key] = val
+        else:
+            data.pop(key, None)
+    member.extra_fields = data or None
+
+    db.session.commit()
+    return "", 204
+
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/district", methods=["POST"])
 @login_required

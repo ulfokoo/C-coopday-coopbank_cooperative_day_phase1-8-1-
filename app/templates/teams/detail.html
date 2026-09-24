@@ -37,6 +37,58 @@
   {% endfor %}
 </ul>
 
+{% if current_section == 'Invitation' %}
+<div class="card mb-4">
+  <div class="card-header bg-white fw-bold">Invitation &mdash; Guests</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr>
+        <th>#</th><th>Name</th><th>Phone</th><th>Account</th><th>Date</th><th>Sign</th><th>Day</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for m in members %}
+        {% set ex = m.extra_fields or {} %}
+        <tr>
+          <td>
+            {{ loop.index }}
+            {% if can_manage_members %}
+            <form id="inv-{{ m.id }}" method="POST" action="{{ url_for('teams.team_member_invite', team_id=team.id, member_id=m.id) }}">
+              {{ member_form.hidden_tag() }}
+            </form>
+            {% endif %}
+          </td>
+          {% if can_manage_members %}
+          <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box" style="min-width:170px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="30" class="form-control form-control-sm inv-box" style="min-width:130px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:150px;"></td>
+          <td><input form="inv-{{ m.id }}" type="date" name="Date" value="{{ ex.get('Date', '') }}" class="form-control form-control-sm inv-box" style="min-width:140px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="Sign" value="{{ ex.get('Sign', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="Day" value="{{ ex.get('Day', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:90px;"></td>
+          <td class="text-end">
+            <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this person?');">
+              {{ member_form.hidden_tag() }}
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          </td>
+          {% else %}
+          <td>{{ m.display_name }}</td>
+          <td>{{ m.phone or '—' }}</td>
+          <td>{{ ex.get('Account') or '—' }}</td>
+          <td>{{ ex.get('Date') or '—' }}</td>
+          <td>{{ ex.get('Sign') or '—' }}</td>
+          <td>{{ ex.get('Day') or '—' }}</td>
+          <td></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No one in Invitation yet. Add names below.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
     <span>{{ current_section }} &mdash; Window Leaders &amp; Staff</span>
@@ -152,6 +204,7 @@
     </table>
   </div>
 </div>
+{% endif %}
 {% else %}
 {# ===== All other teams: simple member list ===== #}
 <div class="card mb-4">
@@ -212,7 +265,7 @@
 
 {% if can_manage_members %}
 <div class="card">
-  <div class="card-header bg-white fw-bold">{{ ('Add Window Leaders to ' ~ current_section) if use_windows else 'Add Team Members' }}</div>
+{% if use_windows %}{{ 'Add People to Invitation' if current_section == 'Invitation' else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
@@ -257,6 +310,41 @@ function handleActionNoteKeydown(e) {
 }
 document.addEventListener("DOMContentLoaded", function () {
 document.querySelectorAll(".action-note-box, .window-box").forEach(autoResizeActionNote);
+});
+
+
+document.addEventListener("DOMContentLoaded", function () {
+  var boxes = Array.from(document.querySelectorAll(".inv-box"));
+
+  function save(input) {
+    var form = input.form;
+    if (!form) return;
+    input.classList.remove("is-invalid");
+    fetch(form.action, {
+      method: "POST",
+      body: new FormData(form),
+      headers: { "X-Requested-With": "fetch" },
+      credentials: "same-origin"
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("save failed");
+        input.classList.add("is-valid");
+        setTimeout(function () { input.classList.remove("is-valid"); }, 1200);
+      })
+      .catch(function () { input.classList.add("is-invalid"); });
+  }
+
+  boxes.forEach(function (input, i) {
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        var next = boxes[i + 1];
+        if (next) { next.focus(); if (next.type === "text") next.select(); }
+        else { input.blur(); }
+      }
+    });
+    input.addEventListener("change", function () { save(input); });
+  });
 });
 
 {% if use_windows and can_manage_members %}
