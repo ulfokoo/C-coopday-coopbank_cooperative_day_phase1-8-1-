@@ -74,6 +74,187 @@ def _is_team_viewer(team):
         return True
     return TeamMember.query.filter_by(team_id=team.id, user_id=current_user.id).first() is not None
 
+# ---------- Invitation tab: Name / Phone / Account / Date / Sign / Day ----------
+
+def _cell_text(val):
+    if val in (None, ""):
+        return ""
+    if hasattr(val, "strftime"):
+        return val.strftime("%Y-%m-%d")
+    if isinstance(val, float) and val.is_integer():
+        val = int(val)
+    return str(val).strip()
+
+
+def _invitation_rows(members):
+    rows = []
+    for m in members:
+        ex = m.extra_fields or {}
+        rows.append([
+            m.display_name, m.phone or "",
+            ex.get("Account", ""), ex.get("Date", ""),
+            ex.get("Sign", ""), ex.get("Day", ""),
+        ])
+    return rows
+
+
+def _invitation_excel(team, section, members):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = section[:31]
+
+    header_fill = PatternFill("solid", fgColor="1F4E3D")
+    header_font = Font(bold=True, color="FFFFFF")
+    thin = Side(style="thin", color="B7B7B7")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    headers = ["S/no", "Name", "Phone", "Account", "Date", "Sign", "Day"]
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    ws.cell(row=1, column=1, value=f"{section} Team").font = Font(bold=True, size=14)
+    ws.cell(row=1, column=1).alignment = center
+
+    for col, h in enumerate(headers, start=1):
+        c = ws.cell(row=3, column=col, value=h)
+        c.font = header_font
+        c.fill = header_fill
+        c.border = border
+        c.alignment = center
+
+    for idx, row in enumerate(_invitation_rows(members), start=1):
+        for col, val in enumerate([idx] + row, start=1):
+            c = ws.cell(row=3 + idx, column=col, value=val)
+            c.border = border
+            c.alignment = center
+
+    for i, w in enumerate([6, 26, 16, 22, 14, 18, 12], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True,
+        download_name=_safe_filename(team.name, section) + ".xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _invitation_pdf(team, section, members):
+    from xml.sax.saxutils import escape
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    styles = getSampleStyleSheet()
+    cell_style = styles["BodyText"]
+    cell_style.fontSize = 9
+    cell_style.leading = 11
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=1.5 * cm, rightMargin=1.5 * cm, topMargin=1.2 * cm, bottomMargin=1.2 * cm,
+    )
+    story = [Paragraph(f"<b>{escape(section)} Team</b>", styles["Title"]), Spacer(1, 10)]
+
+    data = [["#", "Name", "Phone", "Account", "Date", "Sign", "Day"]]
+    for idx, row in enumerate(_invitation_rows(members), start=1):
+        data.append([str(idx)] + [Paragraph(escape(x), cell_style) for x in row])
+    if len(data) == 1:
+        data.append(["No records."] + [""] * 6)
+
+    table = Table(
+        data,
+        colWidths=[1.2 * cm, 6 * cm, 3.5 * cm, 4.5 * cm, 3 * cm, 4.5 * cm, 2.5 * cm],
+        repeatRows=1,
+    )
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E3D")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#B7B7B7")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("TOPPADDING", (0, 1), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
+    ]))
+    story.append(table)
+    doc.build(story)
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True,
+        download_name=_safe_filename(team.name, section) + ".pdf",
+        mimetype="application/pdf",
+    )
+
+
+def _invitation_import(team, section, ws):
+    header_map = {
+        "name": "name", "full name": "name",
+        "phone": "phone", "phone number": "phone", "mobile": "phone",
+        "account": "Account", "account number": "Account",
+        "date": "Date",
+        "sign": "Sign", "signature": "Sign",
+        "day": "Day",
+    }
+    col_map = {}
+    header_row = None
+    for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=6), start=1):
+        found = {}
+        for cell in row:
+            key = header_map.get(_cell_text(cell.value).lower())
+            if key:
+                found[cell.column] = key
+        if "name" in found.values():
+            col_map, header_row = found, r_idx
+            break
+
+    if not header_row:
+        flash("Could not find a 'Name' column in the first rows of that file.", "danger")
+        return _back(team.id, section)
+
+    people = []
+    for row in ws.iter_rows(min_row=header_row + 1):
+        vals = {}
+        for cell in row:
+            key = col_map.get(cell.column)
+            if key:
+                vals[key] = _cell_text(cell.value)
+        if vals.get("name"):
+            people.append(vals)
+
+    if not people:
+        flash("No rows found in that file.", "warning")
+        return _back(team.id, section)
+
+    for m in _section_query(team, section).all():
+        db.session.delete(m)
+    db.session.flush()
+
+    for p in people:
+        extra = {k: p[k][:100] for k in ("Account", "Date", "Sign", "Day") if p.get(k)}
+        db.session.add(TeamMember(
+            team_id=team.id,
+            member_name=p["name"][:150],
+            phone=(p.get("phone") or "")[:30] or None,
+            section=section,
+            extra_fields=extra or None,
+        ))
+
+    log_action("update", "Team", team.id, f"Imported {section} list from Excel ({len(people)} people)")
+    db.session.commit()
+    flash(f"Imported {len(people)} people into {section}.", "success")
+    return _back(team.id, section)
+
 
 @teams_bp.route("/")
 @login_required
@@ -167,6 +348,9 @@ def team_export_excel(team_id):
     if not _is_team_viewer(team):
         abort(403)
     use_windows, section, members = _export_context(team)
+
+    if use_windows and section == "Invitation":
+        return _invitation_excel(team, section, members)
 
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
@@ -300,6 +484,9 @@ def team_import_excel(team_id):
         flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
         return _back(team.id, section)
 
+        if section == "Invitation":
+        return _invitation_import(team, section, ws)
+
     # Map each column to a known field, or treat it as a new custom field.
     col_map = {}
     header_row = next(ws.iter_rows(min_row=3, max_row=3), [])
@@ -405,6 +592,9 @@ def team_export_pdf(team_id):
     if not _is_team_viewer(team):
         abort(403)
     use_windows, section, members = _export_context(team)
+
+    if use_windows and section == "Invitation":
+        return _invitation_pdf(team, section, members)
 
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
