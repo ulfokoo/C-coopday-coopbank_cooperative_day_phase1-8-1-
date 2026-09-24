@@ -4,6 +4,30 @@ from flask import Flask, render_template
 from config import config
 from app.extensions import db, login_manager, migrate, csrf
 
+def _sync_missing_columns():
+    """Add columns defined in the models that are missing in the database."""
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(db.engine)
+        existing_tables = set(insp.get_table_names())
+        dialect = db.engine.dialect
+
+        with db.engine.begin() as conn:
+            for table in db.metadata.sorted_tables:
+                if table.name not in existing_tables:
+                    continue  # missing tables are handled by create_all / seed
+                have = {c["name"] for c in insp.get_columns(table.name)}
+                for col in table.columns:
+                    if col.name in have:
+                        continue
+                    coltype = col.type.compile(dialect=dialect)
+                    conn.execute(
+                        text(f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {coltype}')
+                    )
+                    print(f"[db-sync] added {table.name}.{col.name}")
+    except Exception as e:  # never stop the app from booting
+        print(f"[db-sync] skipped: {e}")
 
 def create_app(config_name=None):
     """Application factory."""
@@ -26,6 +50,11 @@ def create_app(config_name=None):
     # on the declarative base before Flask-Migrate/db.create_all() run) ---
     from app import models  # noqa: F401
     from app.models.user import User
+
+     # --- auto-add any columns that exist in the models but not in the DB ---
+    # (create_all() creates missing tables but never adds columns to existing ones)
+    with app.app_context():
+        _sync_missing_columns()
 
     @login_manager.user_loader
     def load_user(user_id):
