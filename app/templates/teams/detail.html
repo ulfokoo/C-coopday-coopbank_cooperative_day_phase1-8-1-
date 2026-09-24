@@ -73,7 +73,7 @@
             {% if can_manage_members %}
             <form method="POST" action="{{ url_for('teams.team_member_action', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
-              <textarea name="action_note" placeholder="What to do today" maxlength="255" rows="1" class="form-control form-control-sm action-note-box" style="width:28ch; white-space:pre-wrap; overflow:hidden; resize:none;" oninput="autoResizeActionNote(this)" onchange="this.form.submit()">{{ m.action_note or '' }}</textarea>
+              <textarea name="action_note" placeholder="What to do today" maxlength="255" rows="1" class="form-control form-control-sm action-note-box" style="width:28ch; white-space:pre-wrap; overflow:hidden; resize:none;" oninput="autoResizeActionNote(this)" onkeydown="handleActionNoteKeydown(event)" onfocus="handleActionNoteFocus(this)" onchange="this.form.submit()">{{ m.action_note or '' }}</textarea>
             </form>
             {% else %}{{ m.action_note or '—' }}{% endif %}
           </td>
@@ -176,6 +176,25 @@
 function autoResizeActionNote(el) {
   el.style.height = "auto";
   el.style.height = el.scrollHeight + "px";
+}
+function handleActionNoteFocus(el) {
+  if (!el.value) {
+    el.value = "✓ ";
+    el.selectionStart = el.selectionEnd = el.value.length;
+    autoResizeActionNote(el);
+  }
+}
+function handleActionNoteKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    var el = e.target;
+    var start = el.selectionStart;
+    var end = el.selectionEnd;
+    var insert = "\n✓ ";
+    el.value = el.value.slice(0, start) + insert + el.value.slice(end);
+    el.selectionStart = el.selectionEnd = start + insert.length;
+    autoResizeActionNote(el);
+  }
 }
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".action-note-box").forEach(autoResizeActionNote);
