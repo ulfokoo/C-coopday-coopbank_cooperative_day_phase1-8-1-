@@ -1,3 +1,5 @@
+import re
+
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 
@@ -12,6 +14,13 @@ from app.utils.audit import log_action
 
 teams_bp = Blueprint("teams", __name__)
 
+
+def _window_sort_key(member):
+    """Sort by the number in the window label (Window 2 before Window 10).
+    Members with no window go last."""
+    match = re.search(r"\d+", member.window_label or "")
+    number = int(match.group()) if match else 10**9
+    return (number, (member.window_label or "").lower(), member.id)
 
 def _is_team_manager(team):
     """Admin (manage_teams permission) OR the leader of this very team."""
@@ -77,10 +86,14 @@ def team_detail(team_id):
     member_form = TeamMemberForm()
     documents = Document.query.filter_by(team_id=team.id).order_by(Document.created_at.desc()).all()
     members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
+    use_windows = "invitation" in (team.name or "").lower()
+    if use_windows:
+        members.sort(key=_window_sort_key)
     return render_template(
         "teams/detail.html",
         team=team,
         members=members,
+        use_windows=use_windows,
         documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
