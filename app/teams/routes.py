@@ -263,6 +263,29 @@ def team_staff_add(team_id, member_id):
         flash("Please write at least one name.", "danger")
     return _back(team_id, leader.section)
 
+@teams_bp.route("/<int:team_id>/members/<int:staff_id>/staff/move", methods=["POST"])
+@login_required
+def team_staff_move(team_id, staff_id):
+    """Drag-and-drop: reassign a staff member from one window leader to another."""
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    staff = TeamMember.query.filter_by(id=staff_id, team_id=team_id).first_or_404()
+    if staff.parent_id is None:
+        return {"ok": False, "error": "Not a staff member."}, 400
+    new_leader_id = request.form.get("new_leader_id", type=int)
+    new_leader = TeamMember.query.filter_by(id=new_leader_id, team_id=team_id, parent_id=None).first_or_404()
+    if new_leader.section != staff.leader.section:
+        return {"ok": False, "error": "Leaders are in different sections."}, 400
+    old_leader_name = staff.leader.display_name if staff.leader else "?"
+    staff.parent_id = new_leader.id
+    log_action(
+        "update", "TeamMember", staff.id,
+        f"Moved staff {staff.display_name} from {old_leader_name} to {new_leader.display_name}",
+    )
+    db.session.commit()
+    return {"ok": True}
+
 
 def _populate_choices(form):
     form.cooperative_day_id.choices = [

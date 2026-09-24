@@ -1,4 +1,15 @@
 {% extends "base.html" %}
+{% block extra_head %}
+{% if use_windows %}
+<style>
+  .staff-chip[draggable="true"] { cursor: grab; }
+  .staff-chip.staff-dragging { opacity: .4; }
+  .drag-handle { cursor: grab; font-size: .85rem; }
+  .staff-dropzone { min-height: 2.5rem; transition: background-color .12s; }
+  .staff-dropzone.staff-dropzone-hover { background-color: #eaf3ff; outline: 2px dashed #4a90e2; outline-offset: -2px; }
+</style>
+{% endif %}
+{% endblock %}
 {% block title %}{{ team.name }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-start mb-4">
@@ -45,6 +56,21 @@
             {% else %}{{ m.window_label or '—' }}{% endif %}
           </td>
           <td>
+            <td class="staff-dropzone" data-leader-id="{{ m.id }}">
+            {% for s in m.staff|sort(attribute='id') %}
+              <div class="d-flex align-items-center gap-2 mb-1 staff-chip" {% if can_manage_members %}draggable="true" data-staff-id="{{ s.id }}"{% endif %}>
+                {% if can_manage_members %}<span class="drag-handle text-muted" title="Drag to another window">&#9776;</span>{% endif %}
+                <span>{{ s.display_name }}</span>
+                {% if can_manage_members %}
+                <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=s.id) }}" onsubmit="return confirm('Remove this staff member?');">
+                  {{ member_form.hidden_tag() }}
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Remove">&#10005;</button>
+                </form>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="text-muted staff-empty-hint">No staff yet</span>
+            {% endfor %}
             {% for s in m.staff|sort(attribute='id') %}
               <div class="d-flex align-items-center gap-2 mb-1">
                 <span>{{ s.display_name }}</span>
@@ -199,5 +225,60 @@ function handleActionNoteKeydown(e) {
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".action-note-box").forEach(autoResizeActionNote);
 });
+
+{% if use_windows and can_manage_members %}
+(function () {
+  var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  var moveUrlBase = "{{ url_for('teams.team_staff_move', team_id=team.id, staff_id=0) }}".replace("/0/", "/__STAFF__/");
+  var dragged = null;
+
+  document.querySelectorAll(".staff-chip[draggable='true']").forEach(function (chip) {
+    chip.addEventListener("dragstart", function (e) {
+      dragged = chip;
+      chip.classList.add("staff-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", chip.dataset.staffId);
+    });
+    chip.addEventListener("dragend", function () {
+      chip.classList.remove("staff-dragging");
+      dragged = null;
+    });
+  });
+
+  document.querySelectorAll(".staff-dropzone").forEach(function (zone) {
+    zone.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      zone.classList.add("staff-dropzone-hover");
+    });
+    zone.addEventListener("dragleave", function () {
+      zone.classList.remove("staff-dropzone-hover");
+    });
+    zone.addEventListener("drop", function (e) {
+      e.preventDefault();
+      zone.classList.remove("staff-dropzone-hover");
+      if (!dragged) return;
+      var staffId = dragged.dataset.staffId;
+      var newLeaderId = zone.dataset.leaderId;
+      var url = moveUrlBase.replace("__STAFF__", staffId);
+      var body = new URLSearchParams();
+      body.set("new_leader_id", newLeaderId);
+      body.set("csrf_token", csrfToken);
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": csrfToken },
+        body: body.toString(),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok) { location.reload(); }
+          else { alert(data.error || "Could not move staff member."); }
+        })
+        .catch(function () { alert("Could not move staff member."); });
+    });
+  });
+})();
+{% endif %}
 </script>
+
 {% endblock %}
