@@ -1,7 +1,7 @@
 import re
 from io import BytesIO
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, send_file, jsonify
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -38,7 +38,10 @@ def _window_sort_key(member):
 
 
 def _back(team_id, section=None):
-    return redirect(url_for("teams.team_detail", team_id=team_id, section=section))
+    return redirect(url_for(
+        "teams.team_detail", team_id=team_id, section=section,
+        page=request.form.get("page", type=int),
+    ))
 
 
 def _export_context(team):
@@ -74,7 +77,12 @@ def _is_team_viewer(team):
         return True
     return TeamMember.query.filter_by(team_id=team.id, user_id=current_user.id).first() is not None
 
-# ---------- Invitation tab: Name / Phone / Account / Date / Sign / Day ----------
+
+# ---------- Invitation tab: Name / Phone / Account / Date / Sign / Day (+ any extra columns) ----------
+
+INV_FIXED = ("Account", "Date", "Sign", "Day")
+INV_PER_PAGE = 30
+
 
 def _cell_text(val):
     if val in (None, ""):
@@ -86,15 +94,54 @@ def _cell_text(val):
     return str(val).strip()
 
 
-def _invitation_rows(members):
+def _clean_phone(raw):
+    """Returns (value, error). Phone must be exactly 10 digits.
+    Excel often drops the leading 0 (911478198) or people type +251...; both are fixed."""
+    raw = (raw or "").strip()
+    if not raw:
+        return "", None
+    d = re.sub(r"[\s\-().]", "", raw)
+    if d.startswith("+"):
+        d = d[1:]
+    if not d.isdigit():
+        return None, "Phone must contain digits only."
+    if d.startswith("251") and len(d) == 12:
+        d = "0" + d[3:]
+    elif len(d) == 9 and not d.startswith("0"):
+        d = "0" + d
+    if len(d) != 10:
+        return None, "Phone must be exactly 10 digits."
+    return d, None
+
+
+def _clean_account(raw):
+    """Returns (value, error). Account must be exactly 13 digits."""
+    raw = (raw or "").strip()
+    if not raw:
+        return "", None
+    d = re.sub(r"[\s\-]", "", raw)
+    if not d.isdigit() or len(d) != 13:
+        return None, "Account must be exactly 13 digits."
+    return d, None
+
+
+def _invitation_extra_names(members):
+    names = set()
+    for m in members:
+        names.update((m.extra_fields or {}).keys())
+    return sorted(n for n in names if n not in INV_FIXED)
+
+
+def _invitation_rows(members, extra_names):
     rows = []
     for m in members:
         ex = m.extra_fields or {}
-        rows.append([
-            m.display_name, m.phone or "",
-            ex.get("Account", ""), ex.get("Date", ""),
-            ex.get("Sign", ""), ex.get("Day", ""),
-        ])
+        rows.append(
+            [m.display_name, m.phone or "",
+             ex.get("Account", ""), ex.get("Date", ""),
+             ex.get("Sign", ""), ex.get("Day", "")]
+            + [ex.get(n, "") for n in extra_names]
+        )
     return rows
 
 
@@ -102,6 +149,8 @@ def _invitation_excel(team, section, members):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
     from openpyxl.utils import get_column_letter
+
+    extra_names = _invitation_extra_names(members)
 
     wb = Workbook()
     ws = wb.active
@@ -113,7 +162,7 @@ def _invitation_excel(team, section, members):
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    headers = ["S/no", "Name", "Phone", "Account", "Date", "Sign", "Day"]
+    headers = ["S/no", "Name", "Phone", "Account", "Date", "Sign", "Day"] + extra_names
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(row=1, column=1, value=f"{section} Team").font = Font(bold=True, size=14)
     ws.cell(row=1, column=1).alignment = center
@@ -125,13 +174,14 @@ def _invitation_excel(team, section, members):
         c.border = border
         c.alignment = center
 
-    for idx, row in enumerate(_invitation_rows(members), start=1):
+    for idx, row in enumerate(_invitation_rows(members, extra_names), start=1):
         for col, val in enumerate([idx] + row, start=1):
             c = ws.cell(row=3 + idx, column=col, value=val)
             c.border = border
             c.alignment = center
 
-    for i, w in enumerate([6, 26, 16, 22, 14, 18, 12], start=1):
+    widths = [6, 26, 16, 22, 14, 18, 12] + [16] * len(extra_names)
+    for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     buf = BytesIO()
@@ -152,10 +202,12 @@ def _invitation_pdf(team, section, members):
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
+    extra_names = _invitation_extra_names(members)
+
     styles = getSampleStyleSheet()
     cell_style = styles["BodyText"]
-    cell_style.fontSize = 9
-    cell_style.leading = 11
+    cell_style.fontSize = 8 if extra_names else 9
+    cell_style.leading = 10 if extra_names else 11
 
     buf = BytesIO()
     doc = SimpleDocTemplate(
@@ -164,22 +216,24 @@ def _invitation_pdf(team, section, members):
     )
     story = [Paragraph(f"<b>{escape(section)} Team</b>", styles["Title"]), Spacer(1, 10)]
 
-    data = [["#", "Name", "Phone", "Account", "Date", "Sign", "Day"]]
-    for idx, row in enumerate(_invitation_rows(members), start=1):
-        data.append([str(idx)] + [Paragraph(escape(x), cell_style) for x in row])
+    data = [["#", "Name", "Phone", "Account", "Date", "Sign", "Day"] + extra_names]
+    for idx, row in enumerate(_invitation_rows(members, extra_names), start=1):
+        data.append([str(idx)] + [Paragraph(escape(str(x)), cell_style) for x in row])
     if len(data) == 1:
-        data.append(["No records."] + [""] * 6)
+        data.append(["No records."] + [""] * (len(data[0]) - 1))
 
-    table = Table(
-        data,
-        colWidths=[1.2 * cm, 6 * cm, 3.5 * cm, 4.5 * cm, 3 * cm, 4.5 * cm, 2.5 * cm],
-        repeatRows=1,
-    )
+    widths = [1.2 * cm, 6 * cm, 3.5 * cm, 4.5 * cm, 3 * cm, 4.5 * cm, 2.5 * cm] + [2.8 * cm] * len(extra_names)
+    max_w = 26.7 * cm
+    total = sum(widths)
+    if total > max_w:
+        widths = [w * max_w / total for w in widths]
+
+    table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E3D")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("FONTSIZE", (0, 0), (-1, -1), 8 if extra_names else 9),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#B7B7B7")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (0, -1), "CENTER"),
@@ -206,14 +260,18 @@ def _invitation_import(team, section, ws):
         "sign": "Sign", "signature": "Sign",
         "day": "Day",
     }
+    skip_headers = {"s/no", "#", "no", "sn", "s/n", "s.n"}
+
     col_map = {}
     header_row = None
     for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=6), start=1):
         found = {}
         for cell in row:
-            key = header_map.get(_cell_text(cell.value).lower())
-            if key:
-                found[cell.column] = key
+            text_ = _cell_text(cell.value)
+            key = text_.lower()
+            if not text_ or key in skip_headers:
+                continue
+            found[cell.column] = header_map.get(key) or ("extra", text_[:60])
         if "name" in found.values():
             col_map, header_row = found, r_idx
             break
@@ -222,18 +280,40 @@ def _invitation_import(team, section, ws):
         flash("Could not find a 'Name' column in the first rows of that file.", "danger")
         return _back(team.id, section)
 
-    people = []
+    people, problems = [], []
     for row in ws.iter_rows(min_row=header_row + 1):
-        vals = {}
+        vals, extra = {}, {}
         for cell in row:
-            key = col_map.get(cell.column)
-            if key:
-                vals[key] = _cell_text(cell.value)
-        if vals.get("name"):
-            people.append(vals)
+            kind = col_map.get(cell.column)
+            if not kind:
+                continue
+            v = _cell_text(cell.value)
+            if isinstance(kind, tuple):
+                if v:
+                    extra[kind[1]] = v[:100]
+            else:
+                vals[kind] = v
+        if not vals.get("name"):
+            continue
+
+        row_no = row[0].row
+        phone, p_err = _clean_phone(vals.get("phone"))
+        account, a_err = _clean_account(vals.get("Account"))
+        if p_err or a_err:
+            problems.append(f"row {row_no} ({p_err or a_err})")
+            continue
+
+        info = {k: vals[k][:100] for k in ("Date", "Sign", "Day") if vals.get(k)}
+        if account:
+            info["Account"] = account
+        info.update(extra)
+        people.append({"name": vals["name"][:150], "phone": phone, "extra": info})
 
     if not people:
-        flash("No rows found in that file.", "warning")
+        msg = "No valid rows found in that file."
+        if problems:
+            msg += " Problems: " + "; ".join(problems[:5])
+        flash(msg, "danger")
         return _back(team.id, section)
 
     for m in _section_query(team, section).all():
@@ -241,18 +321,26 @@ def _invitation_import(team, section, ws):
     db.session.flush()
 
     for p in people:
-        extra = {k: p[k][:100] for k in ("Account", "Date", "Sign", "Day") if p.get(k)}
         db.session.add(TeamMember(
             team_id=team.id,
-            member_name=p["name"][:150],
-            phone=(p.get("phone") or "")[:30] or None,
+            member_name=p["name"],
+            phone=p["phone"] or None,
             section=section,
-            extra_fields=extra or None,
+            extra_fields=p["extra"] or None,
         ))
 
     log_action("update", "Team", team.id, f"Imported {section} list from Excel ({len(people)} people)")
     db.session.commit()
-    flash(f"Imported {len(people)} people into {section}.", "success")
+
+    if problems:
+        more = f" (+{len(problems) - 5} more)" if len(problems) > 5 else ""
+        flash(
+            f"Imported {len(people)} people. Skipped {len(problems)} row(s): "
+            + "; ".join(problems[:5]) + more,
+            "warning",
+        )
+    else:
+        flash(f"Imported {len(people)} people into {section}.", "success")
     return _back(team.id, section)
 
 
@@ -319,6 +407,16 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
 
+    # Invitation tab: extra columns + paging (30 per page)
+    inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
+    if use_windows and current_section == "Invitation":
+        inv_total = len(members)
+        inv_extra_names = _invitation_extra_names(members)
+        inv_pages = max(1, -(-inv_total // INV_PER_PAGE))
+        inv_page = min(max(request.args.get("page", 1, type=int), 1), inv_pages)
+        inv_offset = (inv_page - 1) * INV_PER_PAGE
+        members = members[inv_offset:inv_offset + INV_PER_PAGE]
+
     extra_field_names = []
     if use_windows:
         names = set()
@@ -334,6 +432,11 @@ def team_detail(team_id):
         sections=WINDOW_SECTIONS,
         current_section=current_section,
         extra_field_names=extra_field_names,
+        inv_extra_names=inv_extra_names,
+        inv_page=inv_page,
+        inv_pages=inv_pages,
+        inv_offset=inv_offset,
+        inv_total=inv_total,
         documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
@@ -452,6 +555,7 @@ def team_export_excel(team_id):
         download_name=filename,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
 
 @teams_bp.route("/<int:team_id>/import.xlsx", methods=["POST"])
 @login_required
@@ -768,6 +872,7 @@ def team_member_window(team_id, member_id):
         flash("Window saved.", "success")
     return _back(team_id, member.section)
 
+
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/field", methods=["POST"])
 @login_required
 def team_member_field(team_id, member_id):
@@ -789,6 +894,7 @@ def team_member_field(team_id, member_id):
         flash(f"'{field_name}' saved.", "success")
     return _back(team_id, member.section)
 
+
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/invite", methods=["POST"])
 @login_required
 def team_member_invite(team_id, member_id):
@@ -797,22 +903,52 @@ def team_member_invite(team_id, member_id):
         abort(403)
     member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
 
+    errors = {}
+
     name = (request.form.get("member_name") or "").strip()
     if name:
         member.member_name = name[:150]
-    member.phone = (request.form.get("phone") or "").strip()[:30] or None
+
+    if "phone" in request.form:
+        phone, err = _clean_phone(request.form.get("phone"))
+        if err:
+            errors["phone"] = err
+        else:
+            member.phone = phone or None
 
     data = dict(member.extra_fields or {})
-    for key in ("Account", "Date", "Sign", "Day"):
-        val = (request.form.get(key) or "").strip()[:100]
+
+    for key in INV_FIXED:
+        if key not in request.form:
+            continue
+        raw = request.form.get(key)
+        if key == "Account":
+            val, err = _clean_account(raw)
+            if err:
+                errors["Account"] = err
+                continue
+        else:
+            val = (raw or "").strip()[:100]
         if val:
             data[key] = val
         else:
             data.pop(key, None)
-    member.extra_fields = data or None
 
+    for form_key, raw in request.form.items():
+        if form_key.startswith("x__"):
+            fname = form_key[3:][:60]
+            val = (raw or "").strip()[:100]
+            if val:
+                data[fname] = val
+            else:
+                data.pop(fname, None)
+
+    member.extra_fields = data or None
     db.session.commit()
-    return "", 204
+
+    if errors:
+        return jsonify(errors=errors), 422
+    return jsonify(saved={"phone": member.phone or "", "Account": data.get("Account", "")}), 200
 
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/district", methods=["POST"])
@@ -876,6 +1012,7 @@ def team_staff_add(team_id, member_id):
     else:
         flash("Please write at least one name.", "danger")
     return _back(team_id, leader.section)
+
 
 @teams_bp.route("/<int:team_id>/members/<int:staff_id>/staff/move", methods=["POST"])
 @login_required

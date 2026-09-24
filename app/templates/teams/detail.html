@@ -40,7 +40,7 @@
 {% if current_section == 'Invitation' %}
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-    <span>Invitation &mdash; Guests</span>
+    <span>Invitation &mdash; Guests <span class="text-muted fw-normal">({{ inv_total }})</span></span>
     <div class="d-flex gap-2">
       {% if can_manage_members %}
       <form method="POST" action="{{ url_for('teams.team_import_excel', team_id=team.id, section=current_section) }}" enctype="multipart/form-data" id="importExcelForm">
@@ -63,17 +63,20 @@
       </div>
     </div>
   </div>
+  <div id="invMsg" class="text-danger small px-3 pt-2"></div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr>
-        <th>#</th><th>Name</th><th>Phone</th><th>Account</th><th>Date</th><th>Sign</th><th>Day</th><th></th>
+        <th>#</th><th>Name</th><th>Phone</th><th>Account</th><th>Date</th><th>Sign</th><th>Day</th>
+        {% for fname in inv_extra_names %}<th>{{ fname }}</th>{% endfor %}
+        <th></th>
       </tr></thead>
       <tbody>
       {% for m in members %}
         {% set ex = m.extra_fields or {} %}
         <tr>
           <td>
-            {{ loop.index }}
+            {{ inv_offset + loop.index }}
             {% if can_manage_members %}
             <form id="inv-{{ m.id }}" method="POST" action="{{ url_for('teams.team_member_invite', team_id=team.id, member_id=m.id) }}">
               {{ member_form.hidden_tag() }}
@@ -82,14 +85,18 @@
           </td>
           {% if can_manage_members %}
           <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box" style="min-width:170px;"></td>
-          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="30" class="form-control form-control-sm inv-box" style="min-width:130px;"></td>
-          <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:150px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="15" inputmode="numeric" placeholder="10 digits" class="form-control form-control-sm inv-box" style="min-width:130px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="20" inputmode="numeric" placeholder="13 digits" class="form-control form-control-sm inv-box" style="min-width:150px;"></td>
           <td><input form="inv-{{ m.id }}" type="date" name="Date" value="{{ ex.get('Date', '') }}" class="form-control form-control-sm inv-box" style="min-width:140px;"></td>
           <td><input form="inv-{{ m.id }}" type="text" name="Sign" value="{{ ex.get('Sign', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
           <td><input form="inv-{{ m.id }}" type="text" name="Day" value="{{ ex.get('Day', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:90px;"></td>
+          {% for fname in inv_extra_names %}
+          <td><input form="inv-{{ m.id }}" type="text" name="x__{{ fname }}" value="{{ ex.get(fname, '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
+          {% endfor %}
           <td class="text-end">
             <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this person?');">
               {{ member_form.hidden_tag() }}
+              <input type="hidden" name="page" value="{{ inv_page }}">
               <button class="btn btn-sm btn-outline-danger">Remove</button>
             </form>
           </td>
@@ -100,15 +107,38 @@
           <td>{{ ex.get('Date') or '—' }}</td>
           <td>{{ ex.get('Sign') or '—' }}</td>
           <td>{{ ex.get('Day') or '—' }}</td>
+          {% for fname in inv_extra_names %}<td>{{ ex.get(fname) or '—' }}</td>{% endfor %}
           <td></td>
           {% endif %}
         </tr>
       {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">No one in Invitation yet. Add names below.</td></tr>
+        <tr><td colspan="{{ 8 + inv_extra_names|length }}" class="text-center text-muted py-4">No one in Invitation yet. Add names below.</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if inv_pages > 1 %}
+  <div class="p-3 d-flex flex-column align-items-center gap-2">
+    <div class="text-muted small">
+      Showing {{ inv_offset + 1 }}&ndash;{{ inv_offset + members|length }} of {{ inv_total }}
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center">
+        <li class="page-item {{ 'disabled' if inv_page <= 1 else '' }}">
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=inv_page - 1) }}">&laquo;</a>
+        </li>
+        {% for p in range(1, inv_pages + 1) %}
+        <li class="page-item {{ 'active' if p == inv_page else '' }}">
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=p) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if inv_page >= inv_pages else '' }}">
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=inv_page + 1) }}">&raquo;</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 </div>
 {% else %}
 
@@ -221,7 +251,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No window leaders in {{ current_section }} yet.</td></tr>
+        <tr><td colspan="{{ 6 + extra_field_names|length }}" class="text-center text-muted py-4">No window leaders in {{ current_section }} yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -288,7 +318,7 @@
 
 {% if can_manage_members %}
 <div class="card">
-{% if use_windows %}{{ 'Add People to Invitation' if current_section == 'Invitation' else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}
+  <div class="card-header bg-white fw-bold">{% if use_windows %}{{ 'Add People to Invitation' if current_section == 'Invitation' else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
@@ -332,12 +362,19 @@ function handleActionNoteKeydown(e) {
   }
 }
 document.addEventListener("DOMContentLoaded", function () {
-document.querySelectorAll(".action-note-box, .window-box").forEach(autoResizeActionNote);
+  document.querySelectorAll(".action-note-box, .window-box").forEach(autoResizeActionNote);
 });
 
-
+// ---- Invitation table: save each row in the background, Enter moves to the next box ----
 document.addEventListener("DOMContentLoaded", function () {
   var boxes = Array.from(document.querySelectorAll(".inv-box"));
+  var msg = document.getElementById("invMsg");
+
+  function ok(input) {
+    input.classList.add("is-valid");
+    setTimeout(function () { input.classList.remove("is-valid"); }, 1200);
+    if (msg && !document.querySelector(".inv-box.is-invalid")) msg.textContent = "";
+  }
 
   function save(input) {
     var form = input.form;
@@ -350,11 +387,31 @@ document.addEventListener("DOMContentLoaded", function () {
       credentials: "same-origin"
     })
       .then(function (r) {
-        if (!r.ok) throw new Error("save failed");
-        input.classList.add("is-valid");
-        setTimeout(function () { input.classList.remove("is-valid"); }, 1200);
+        return r.json().then(function (j) { return { status: r.status, json: j }; });
       })
-      .catch(function () { input.classList.add("is-invalid"); });
+      .then(function (res) {
+        if (res.status === 200) {
+          var saved = res.json.saved || {};
+          if (input.name === "phone" && saved.phone !== undefined) input.value = saved.phone;
+          ok(input);
+        } else if (res.status === 422) {
+          var err = res.json.errors && res.json.errors[input.name];
+          if (err) {
+            input.classList.add("is-invalid");
+            var row = input.closest("tr");
+            var nameBox = row ? row.querySelector("input[name=member_name]") : null;
+            if (msg) msg.textContent = (nameBox ? nameBox.value + ": " : "") + err;
+          } else {
+            ok(input);
+          }
+        } else {
+          throw new Error("save failed");
+        }
+      })
+      .catch(function () {
+        input.classList.add("is-invalid");
+        if (msg) msg.textContent = "Could not save. Please try again.";
+      });
   }
 
   boxes.forEach(function (input, i) {
@@ -423,38 +480,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 })();
 {% endif %}
-
-document.addEventListener("DOMContentLoaded", function () {
-  var boxes = Array.from(document.querySelectorAll("input.quick-save"));
-
-  function save(input) {
-    var form = input.form;
-    input.classList.remove("is-invalid");
-    fetch(form.action, {
-      method: "POST",
-      body: new FormData(form),
-      headers: { "X-Requested-With": "fetch" },
-      credentials: "same-origin"
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error("save failed");
-        input.classList.add("is-valid");
-        setTimeout(function () { input.classList.remove("is-valid"); }, 1200);
-      })
-      .catch(function () { input.classList.add("is-invalid"); });
-  }
-
-  boxes.forEach(function (input, i) {
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        var next = boxes[i + 1];
-        if (next) { next.focus(); next.select(); } else { input.blur(); }
-      }
-    });
-    input.addEventListener("change", function () { save(input); });
-  });
-});
 </script>
 
 {% endblock %}
