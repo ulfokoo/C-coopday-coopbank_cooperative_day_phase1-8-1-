@@ -573,6 +573,8 @@ def team_member_window(team_id, member_id):
         member.window_label = (form.window_label.data or "").strip() or None
         log_action("update", "TeamMember", member.id, f"Set window for {member.display_name}")
         db.session.commit()
+        if request.headers.get("X-Requested-With") == "fetch":
+            return "", 204
         flash("Window saved.", "success")
     return _back(team_id, member.section)
 
@@ -610,6 +612,8 @@ def team_member_district(team_id, member_id):
         member.district = (form.district.data or "").strip() or None
         log_action("update", "TeamMember", member.id, f"Set district for {member.display_name}")
         db.session.commit()
+        if request.headers.get("X-Requested-With") == "fetch":
+            return "", 204
         flash("District saved.", "success")
     return _back(team_id, member.section)
 
