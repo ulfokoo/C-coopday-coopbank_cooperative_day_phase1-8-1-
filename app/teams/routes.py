@@ -138,6 +138,13 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
 
+    extra_field_names = []
+    if use_windows:
+        names = set()
+        for m in members:
+            names.update((m.extra_fields or {}).keys())
+        extra_field_names = sorted(names)
+
     return render_template(
         "teams/detail.html",
         team=team,
@@ -145,6 +152,7 @@ def team_detail(team_id):
         use_windows=use_windows,
         sections=WINDOW_SECTIONS,
         current_section=current_section,
+        extra_field_names=extra_field_names,
         documents=documents,
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
@@ -176,14 +184,22 @@ def team_export_excel(team_id):
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
+    extra_field_names = []
+    if use_windows:
+        names = set()
+        for m in members:
+            names.update((m.extra_fields or {}).keys())
+        extra_field_names = sorted(names)
+
     title_text = f"{section} Team" if section else team.name
-    n_cols = 5 if use_windows else 3
+    base_cols = 6  # S/no, Leader, Window, District, Staff, Action
+    n_cols = (base_cols + len(extra_field_names)) if use_windows else 3
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
     ws.cell(row=1, column=1, value=title_text).font = title_font
     ws.cell(row=1, column=1).alignment = center
 
     if use_windows:
-        headers = ["S/no", "Leader", "Window", "Staff", "Action"]
+        headers = ["S/no", "Leader", "Window", "District", "Staff", "Action"] + extra_field_names
     else:
         headers = ["#", "Name", "Added"]
     for col, h in enumerate(headers, start=1):
@@ -195,6 +211,10 @@ def team_export_excel(team_id):
 
     row_ptr = 4
     if use_windows:
+        staff_col = 5
+        total_cols = base_cols + len(extra_field_names)
+        merge_cols = [c for c in range(1, total_cols + 1) if c != staff_col]
+
         for idx, m in enumerate(members, start=1):
             staff = sorted(m.staff, key=lambda s: s.id)
             staff_names = [s.display_name for s in staff] or ["No staff yet"]
@@ -204,22 +224,25 @@ def team_export_excel(team_id):
             ws.cell(row=start_row, column=1, value=idx)
             ws.cell(row=start_row, column=2, value=m.display_name)
             ws.cell(row=start_row, column=3, value=m.window_label or "")
-            ws.cell(row=start_row, column=5, value=m.action_note or "")
+            ws.cell(row=start_row, column=4, value=m.district or "")
+            ws.cell(row=start_row, column=6, value=m.action_note or "")
+            for i, fname in enumerate(extra_field_names):
+                ws.cell(row=start_row, column=7 + i, value=(m.extra_fields or {}).get(fname, ""))
             for i, name in enumerate(staff_names):
-                ws.cell(row=row_ptr + i, column=4, value=name)
+                ws.cell(row=row_ptr + i, column=staff_col, value=name)
 
             if span > 1:
-                for col in (1, 2, 3, 5):
+                for col in merge_cols:
                     ws.merge_cells(start_row=start_row, end_row=end_row, start_column=col, end_column=col)
 
             for r in range(start_row, end_row + 1):
-                for col in range(1, 6):
+                for col in range(1, total_cols + 1):
                     cell = ws.cell(row=r, column=col)
                     cell.border = border
-                    cell.alignment = left if col == 4 else center
+                    cell.alignment = left if col == staff_col else center
             row_ptr = end_row + 1
 
-        widths = [6, 22, 14, 26, 30]
+        widths = [6, 22, 14, 16, 26, 30] + [18] * len(extra_field_names)
     else:
         for idx, m in enumerate(members, start=1):
             ws.cell(row=row_ptr, column=1, value=idx)
@@ -277,19 +300,60 @@ def team_import_excel(team_id):
         flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
         return _back(team.id, section)
 
+    # Map each column to a known field, or treat it as a new custom field.
+    col_map = {}
+    header_row = next(ws.iter_rows(min_row=3, max_row=3), [])
+    for cell in header_row:
+        text = str(cell.value).strip() if cell.value not in (None, "") else ""
+        if not text:
+            continue
+        key = text.lower()
+        if key in ("s/no", "#", "no"):
+            col_map[cell.column] = "sno"
+        elif key == "leader":
+            col_map[cell.column] = "leader"
+        elif key == "window":
+            col_map[cell.column] = "window"
+        elif key == "district":
+            col_map[cell.column] = "district"
+        elif key == "staff":
+            col_map[cell.column] = "staff"
+        elif key == "action":
+            col_map[cell.column] = "action"
+        else:
+            col_map[cell.column] = ("extra", text)
+
     groups = []
     current = None
     for row in ws.iter_rows(min_row=4):
-        leader_cell = row[1].value if len(row) > 1 else None
-        window_cell = row[2].value if len(row) > 2 else None
-        staff_cell = row[3].value if len(row) > 3 else None
-        action_cell = row[4].value if len(row) > 4 else None
+        row_leader = row_window = row_district = row_action = row_staff = None
+        row_extra = {}
+        for cell in row:
+            kind = col_map.get(cell.column)
+            if not kind:
+                continue
+            val = cell.value
+            val = str(val).strip() if val not in (None, "") else ""
+            if kind == "leader":
+                row_leader = val
+            elif kind == "window":
+                row_window = val
+            elif kind == "district":
+                row_district = val
+            elif kind == "staff":
+                row_staff = val
+            elif kind == "action":
+                row_action = val
+            elif isinstance(kind, tuple) and kind[0] == "extra":
+                row_extra[kind[1]] = val
 
-        if leader_cell not in (None, ""):
+        if row_leader:
             current = {
-                "leader": str(leader_cell).strip(),
-                "window": (str(window_cell).strip() if window_cell not in (None, "") else ""),
-                "action": (str(action_cell).strip() if action_cell not in (None, "") else ""),
+                "leader": row_leader,
+                "window": row_window or "",
+                "district": row_district or "",
+                "action": row_action or "",
+                "extra": {k: v for k, v in row_extra.items() if v},
                 "staff": [],
             }
             groups.append(current)
@@ -297,15 +361,17 @@ def team_import_excel(team_id):
         if current is None:
             continue
 
-        staff_name = str(staff_cell).strip() if staff_cell not in (None, "") else ""
-        if staff_name and staff_name.lower() != "no staff yet":
-            current["staff"].append(staff_name)
+        for k, v in row_extra.items():
+            if v:
+                current["extra"][k] = v
+
+        if row_staff and row_staff.lower() != "no staff yet":
+            current["staff"].append(row_staff)
 
     if not groups:
         flash("No rows found in that file.", "warning")
         return _back(team.id, section)
 
-    # Replace this section's leaders + staff with what's in the uploaded file.
     existing = _section_query(team, section).all()
     for m in existing:
         db.session.delete(m)
@@ -316,8 +382,10 @@ def team_import_excel(team_id):
             team_id=team.id,
             member_name=g["leader"].rstrip(","),
             window_label=g["window"] or None,
+            district=g["district"] or None,
             action_note=g["action"] or None,
             section=section,
+            extra_fields=g["extra"] or None,
         )
         db.session.add(leader)
         db.session.flush()
@@ -349,17 +417,24 @@ def team_export_pdf(team_id):
     cell_style.fontSize = 9
     cell_style.leading = 11
 
+    extra_field_names = []
+    if use_windows:
+        names = set()
+        for m in members:
+            names.update((m.extra_fields or {}).keys())
+        extra_field_names = sorted(names)
+
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=landscape(A4),
         leftMargin=1.5 * cm, rightMargin=1.5 * cm, topMargin=1.2 * cm, bottomMargin=1.2 * cm,
     )
-    title_text = team.name + (f" \u2014 {section}" if section else "")
+    title_text = f"{section} Team" if section else team.name
     story = [Paragraph(f"<b>{title_text}</b>", styles["Title"]), Spacer(1, 10)]
 
     spans = []
     if use_windows:
-        data = [["#", "Leader", "Window", "Staff", "Action"]]
+        data = [["#", "Leader", "Window", "District", "Staff", "Action"] + extra_field_names]
         row_ptr = 1
         for idx, m in enumerate(members, start=1):
             staff = sorted(m.staff, key=lambda s: s.id)
@@ -367,18 +442,22 @@ def team_export_pdf(team_id):
             span = len(staff_names)
             start_row, end_row = row_ptr, row_ptr + span - 1
             for i, name in enumerate(staff_names):
-                data.append([
+                row = [
                     str(idx) if i == 0 else "",
                     Paragraph(m.display_name, cell_style) if i == 0 else "",
-                    m.window_label or "" if i == 0 else "",
+                    (m.window_label or "") if i == 0 else "",
+                    (m.district or "") if i == 0 else "",
                     Paragraph(name, cell_style),
                     Paragraph(m.action_note or "", cell_style) if i == 0 else "",
-                ])
+                ]
+                for fname in extra_field_names:
+                    row.append(Paragraph((m.extra_fields or {}).get(fname, ""), cell_style) if i == 0 else "")
+                data.append(row)
             if span > 1:
-                for col in (0, 1, 2, 4):
+                for col in [0, 1, 2, 3, 5] + list(range(6, 6 + len(extra_field_names))):
                     spans.append(("SPAN", (col, start_row), (col, end_row)))
             row_ptr = end_row + 1
-        col_widths = [1.5 * cm, 4.5 * cm, 3 * cm, 6 * cm, 8 * cm]
+        col_widths = [1.3 * cm, 3.5 * cm, 2.3 * cm, 2.3 * cm, 5 * cm, 6 * cm] + [3.5 * cm] * len(extra_field_names)
     else:
         data = [["#", "Name", "Added"]]
         for idx, m in enumerate(members, start=1):
@@ -387,7 +466,7 @@ def team_export_pdf(team_id):
         col_widths = [1.5 * cm, 10 * cm, 4 * cm]
 
     if len(data) == 1:
-        data.append(["No records." if use_windows else "No members.", "", "", "", ""][: len(data[0])])
+        data.append(["No records." if use_windows else "No members."] + [""] * (len(data[0]) - 1))
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
@@ -496,6 +575,28 @@ def team_member_window(team_id, member_id):
         db.session.commit()
         flash("Window saved.", "success")
     return _back(team_id, member.section)
+
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/field", methods=["POST"])
+@login_required
+def team_member_field(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+    field_name = (request.form.get("field_name") or "").strip()
+    field_value = (request.form.get("field_value") or "").strip()
+    if field_name:
+        data = dict(member.extra_fields or {})
+        if field_value:
+            data[field_name] = field_value
+        else:
+            data.pop(field_name, None)
+        member.extra_fields = data
+        log_action("update", "TeamMember", member.id, f"Set field '{field_name}' for {member.display_name}")
+        db.session.commit()
+        flash(f"'{field_name}' saved.", "success")
+    return _back(team_id, member.section)
+
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/district", methods=["POST"])
 @login_required
