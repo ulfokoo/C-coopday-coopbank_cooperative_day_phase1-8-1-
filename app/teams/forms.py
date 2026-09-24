@@ -27,3 +27,7 @@ class TeamMemberForm(FlaskForm):
 
 class WindowForm(FlaskForm):
     window_label = StringField("Window", validators=[Optional(), Length(max=80)])
+
+
+class ActionForm(FlaskForm):
+    action_note = StringField("Action", validators=[Optional(), Length(max=255)])

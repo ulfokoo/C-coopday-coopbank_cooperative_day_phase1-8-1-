@@ -8,7 +8,7 @@ from app.models.team import Team, TeamMember, WINDOW_SECTIONS
 from app.models.document import Document
 from app.models.event import CooperativeDay
 from app.models.user import User
-from app.teams.forms import TeamForm, TeamMemberForm, WindowForm
+from app.teams.forms import TeamForm, TeamMemberForm, WindowForm, ActionForm
 from app.utils.decorators import permission_required
 from app.utils.audit import log_action
 
@@ -216,6 +216,22 @@ def team_member_window(team_id, member_id):
         log_action("update", "TeamMember", member.id, f"Set window for {member.display_name}")
         db.session.commit()
         flash("Window saved.", "success")
+    return _back(team_id, member.section)
+
+
+@teams_bp.route("/<int:team_id>/members/<int:member_id>/action", methods=["POST"])
+@login_required
+def team_member_action(team_id, member_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
+    form = ActionForm()
+    if form.validate_on_submit():
+        member.action_note = (form.action_note.data or "").strip() or None
+        log_action("update", "TeamMember", member.id, f"Set today's action for {member.display_name}")
+        db.session.commit()
+        flash("Action saved.", "success")
     return _back(team_id, member.section)
 
 

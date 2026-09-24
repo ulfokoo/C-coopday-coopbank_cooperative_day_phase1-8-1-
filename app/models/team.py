@@ -50,6 +50,7 @@ class TeamMember(db.Model):
     # Window leader / staff structure
     window_label = db.Column(db.String(80))  # e.g. "Window 1"
     section = db.Column(db.String(50))       # Invitation / Registration / Per-diem
+    action_note = db.Column(db.String(255))  # what this leader needs to do that day
     parent_id = db.Column(db.Integer, db.ForeignKey("team_members.id"))  # set = this person is staff under a leader
     staff = db.relationship(
         "TeamMember",
