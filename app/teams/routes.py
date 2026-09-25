@@ -606,7 +606,7 @@ def team_detail(team_id):
     inv_flags, inv_problems = {}, 0
     inv_visible_fixed = set()
     inv_problem_ids = []
-    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
+    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants", "Per-diem"):
         inv_total = len(members)
         inv_extra_names = _invitation_extra_names(members)
         inv_visible_fixed = _invitation_visible_fixed(members)
@@ -666,7 +666,7 @@ def team_export_excel(team_id):
     members = _apply_inv_filter(members, request.args.get("filter_col"), request.args.get("filter_val"))
     members = _apply_zone_filter(members, zones)
 
-    if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
+    if use_windows and section in ("Invitation", "Participants", "Registration Participants", "Per-diem"):
         return _invitation_excel(team, section, members, zones=zones)
 
     from openpyxl import Workbook
@@ -804,7 +804,7 @@ def team_import_excel(team_id):
         flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
         return _back(team.id, section)
 
-    if section in ("Invitation", "Participants", "Registration Participants"):
+    if section in ("Invitation", "Participants", "Registration Participants", "Per-diem"):
         return _invitation_import(team, section, ws, mode=mode, zone=zone)
 
     # Map each column to a known field, or treat it as a new custom field.
@@ -939,7 +939,7 @@ def team_export_pdf(team_id):
     zones = request.args.getlist("zone")
     members = _apply_zone_filter(members, zones)
 
-    if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
+    if use_windows and section in ("Invitation", "Participants", "Registration Participants", "Per-diem"):
         return _invitation_pdf(team, section, members, zones=zones)
 
     from reportlab.lib.pagesizes import A4, landscape
@@ -1063,7 +1063,7 @@ def team_member_add(team_id):
         pool = _section_query(team, section) if section else team.members
         existing = {(m.member_name or "").strip().lower() for m in pool}
         # Invitation: the same name may be added twice on purpose; it is then shown in red.
-        allow_dupes = section in ("Invitation", "Participants", "Registration Participants")
+        allow_dupes = section in ("Invitation", "Participants", "Registration Participants", "Per-diem")
         added = 0
         for line in form.names.data.splitlines():
             name = line.strip()

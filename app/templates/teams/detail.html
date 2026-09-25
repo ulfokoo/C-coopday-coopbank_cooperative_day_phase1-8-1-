@@ -38,8 +38,9 @@
   {% endfor %}
 </ul>
 
-{% if current_section in ('Invitation', 'Participants', 'Registration Participants') %}
-{# ===== Sub-links: Organizations/Participants under Invitation, Team/Participant under Registration ===== #}
+{% if current_section in ('Invitation', 'Participants', 'Registration Participants', 'Per-diem') %}
+{# ===== Sub-links: Organizations/Participants under Invitation, Team/Participant under Registration. Per-diem has no sub-tabs — it's Participants-only. ===== #}
+{% if current_section != 'Per-diem' %}
 <ul class="nav nav-pills mb-3" style="--bs-nav-pills-link-active-bg:#6c757d;">
   {% if current_section in ('Invitation', 'Participants') %}
   <li class="nav-item">
@@ -61,6 +62,7 @@
   </li>
   {% endif %}
 </ul>
+{% endif %}
 
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
@@ -412,7 +414,7 @@
 </div>
 
 {% if can_manage_members %}
-<div class="card-header bg-white fw-bold">{% if use_windows %}{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants', 'Registration Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
+<div class="card-header bg-white fw-bold">{% if use_windows %}{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants', 'Registration Participants', 'Per-diem') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
