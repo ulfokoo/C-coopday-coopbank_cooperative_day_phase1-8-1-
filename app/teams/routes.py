@@ -51,7 +51,7 @@ def _export_context(team):
     section = None
     if use_windows:
         section = request.args.get("section")
-        if section not in WINDOW_SECTIONS and section != "Participants":
+        if section not in WINDOW_SECTIONS and section != "Participants" and section != "Registration Participants":
             section = WINDOW_SECTIONS[0]
         members = _section_query(team, section).order_by(TeamMember.id).all()
         members.sort(key=_window_sort_key)
@@ -492,7 +492,7 @@ def team_detail(team_id):
     current_section = None
     if use_windows:
         current_section = request.args.get("section")
-        if current_section not in WINDOW_SECTIONS and current_section != "Participants":
+        if current_section not in WINDOW_SECTIONS and current_section != "Participants" and current_section != "Registration Participants":
             current_section = WINDOW_SECTIONS[0]
         members = _section_query(team, current_section).order_by(TeamMember.id).all()
         members.sort(key=_window_sort_key)
@@ -504,7 +504,7 @@ def team_detail(team_id):
     inv_flags, inv_problems = {}, 0
     inv_visible_fixed = set()
     inv_problem_ids = []
-    if use_windows and current_section in ("Invitation", "Participants"):
+    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
         inv_total = len(members)
         inv_extra_names = _invitation_extra_names(members)
         inv_visible_fixed = _invitation_visible_fixed(members)
@@ -559,7 +559,7 @@ def team_export_excel(team_id):
         abort(403)
     use_windows, section, members = _export_context(team)
 
-    if use_windows and section in ("Invitation", "Participants"):
+    if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
         return _invitation_excel(team, section, members)
 
     from openpyxl import Workbook
@@ -676,7 +676,7 @@ def team_import_excel(team_id):
         abort(404)
 
     section = request.form.get("section") or request.args.get("section")
-    if section not in WINDOW_SECTIONS and section != "Participants":
+    if section not in WINDOW_SECTIONS and section != "Participants" and section != "Registration Participants":
         section = WINDOW_SECTIONS[0]
 
     file = request.files.get("excel_file")
@@ -695,7 +695,7 @@ def team_import_excel(team_id):
         flash("Could not read that file. Make sure it's a valid .xlsx export.", "danger")
         return _back(team.id, section)
 
-    if section in ("Invitation", "Participants"):
+    if section in ("Invitation", "Participants", "Registration Participants"):
         return _invitation_import(team, section, ws)
 
     # Map each column to a known field, or treat it as a new custom field.
@@ -921,14 +921,14 @@ def team_member_add(team_id):
         abort(403)
     use_windows = _uses_windows(team)
     section = request.form.get("section")
-    if not use_windows or (section not in WINDOW_SECTIONS and section != "Participants"):
+    if not use_windows or (section not in WINDOW_SECTIONS and section != "Participants" and section != "Registration Participants"):
         section = None
     form = TeamMemberForm()
     if form.validate_on_submit():
         pool = _section_query(team, section) if section else team.members
         existing = {(m.member_name or "").strip().lower() for m in pool}
         # Invitation: the same name may be added twice on purpose; it is then shown in red.
-        allow_dupes = section in ("Invitation", "Participants")
+        allow_dupes = section in ("Invitation", "Participants", "Registration Participants")
         added = 0
         for line in form.names.data.splitlines():
             name = line.strip()

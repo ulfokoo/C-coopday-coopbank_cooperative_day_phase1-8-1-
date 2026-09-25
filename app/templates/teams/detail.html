@@ -32,14 +32,16 @@
 <ul class="nav nav-pills mb-3">
   {% for s in sections %}
   <li class="nav-item">
-    <a class="nav-link {{ 'active' if (s == current_section) or (s == 'Invitation' and current_section == 'Participants') else '' }}"
+    <a class="nav-link {{ 'active' if (s == current_section) or (s == 'Invitation' and current_section == 'Participants') or (s == 'Registration' and current_section == 'Registration Participants') else '' }}"
        href="{{ url_for('teams.team_detail', team_id=team.id, section=s) }}">{{ s }}</a>
   </li>
   {% endfor %}
 </ul>
 
-{% if current_section in ('Invitation', 'Participants') %}
+{% if current_section in ('Invitation', 'Participants', 'Registration Participants') %}
+{# ===== Sub-links: Organizations/Participants under Invitation, Team/Participant under Registration ===== #}
 <ul class="nav nav-pills mb-3" style="--bs-nav-pills-link-active-bg:#6c757d;">
+  {% if current_section in ('Invitation', 'Participants') %}
   <li class="nav-item">
     <a class="nav-link {{ 'active' if current_section == 'Invitation' else '' }}"
        href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation') }}">Organizations</a>
@@ -48,6 +50,16 @@
     <a class="nav-link {{ 'active' if current_section == 'Participants' else '' }}"
        href="{{ url_for('teams.team_detail', team_id=team.id, section='Participants') }}">Participants</a>
   </li>
+  {% else %}
+  <li class="nav-item">
+    <a class="nav-link"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Registration') }}">Team</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link active"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Registration Participants') }}">Participant</a>
+  </li>
+  {% endif %}
 </ul>
 
 <div class="card mb-4">
@@ -168,6 +180,19 @@
   {% endif %}
 </div>
 {% else %}
+
+{% if current_section == 'Registration' %}
+<ul class="nav nav-pills mb-3" style="--bs-nav-pills-link-active-bg:#6c757d;">
+  <li class="nav-item">
+    <a class="nav-link active"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Registration') }}">Team</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Registration Participants') }}">Participant</a>
+  </li>
+</ul>
+{% endif %}
 
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
@@ -345,7 +370,7 @@
 
 {% if can_manage_members %}
 <div class="card">
-  {% if use_windows %}{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
+{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants', 'Registration Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
