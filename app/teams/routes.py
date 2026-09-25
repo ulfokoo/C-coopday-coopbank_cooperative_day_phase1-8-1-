@@ -217,16 +217,16 @@ def _invitation_extra_names(members):
     return sorted(n for n in names if n not in INV_FIXED)
 
 
-def _invitation_rows(members, extra_names):
+def _invitation_rows(members, extra_names, visible_fixed):
     rows = []
     for m in members:
         ex = m.extra_fields or {}
-        rows.append(
-            [m.display_name, m.phone or "",
-             ex.get("Account", ""), ex.get("Date", ""),
-             ex.get("Sign", ""), ex.get("Day", "")]
-            + [ex.get(n, "") for n in extra_names]
-        )
+        row = [m.display_name, m.phone or ""]
+        for key in ("Account", "Date", "Sign", "Day"):
+            if key in visible_fixed:
+                row.append(ex.get(key, ""))
+        row += [ex.get(n, "") for n in extra_names]
+        rows.append(row)
     return rows
 
 
@@ -236,6 +236,9 @@ def _invitation_excel(team, section, members):
     from openpyxl.utils import get_column_letter
 
     extra_names = _invitation_extra_names(members)
+    visible_fixed = _invitation_visible_fixed(members)
+    fixed_headers = [h for h in ("Account", "Date", "Sign", "Day") if h in visible_fixed]
+    fixed_widths = {"Account": 22, "Date": 14, "Sign": 18, "Day": 12}
 
     wb = Workbook()
     ws = wb.active
@@ -247,7 +250,7 @@ def _invitation_excel(team, section, members):
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    headers = ["S/no", "Name", "Phone", "Account", "Date", "Sign", "Day"] + extra_names
+    headers = ["S/no", "Name", "Phone"] + fixed_headers + extra_names
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(row=1, column=1, value=f"{section} Team").font = Font(bold=True, size=14)
     ws.cell(row=1, column=1).alignment = center
@@ -259,13 +262,13 @@ def _invitation_excel(team, section, members):
         c.border = border
         c.alignment = center
 
-    for idx, row in enumerate(_invitation_rows(members, extra_names), start=1):
+    for idx, row in enumerate(_invitation_rows(members, extra_names, visible_fixed), start=1):
         for col, val in enumerate([idx] + row, start=1):
             c = ws.cell(row=3 + idx, column=col, value=val)
             c.border = border
             c.alignment = center
 
-    widths = [6, 26, 16, 22, 14, 18, 12] + [16] * len(extra_names)
+    widths = [6, 26, 16] + [fixed_widths[h] for h in fixed_headers] + [16] * len(extra_names)
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -288,8 +291,12 @@ def _invitation_pdf(team, section, members):
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
     extra_names = _invitation_extra_names(members)
+    visible_fixed = _invitation_visible_fixed(members)
+    fixed_headers = [h for h in ("Account", "Date", "Sign", "Day") if h in visible_fixed]
+    fixed_widths_map = {"Account": 4.5, "Date": 3, "Sign": 4.5, "Day": 2.5}
 
     styles = getSampleStyleSheet()
+
     cell_style = styles["BodyText"]
     cell_style.fontSize = 8 if extra_names else 9
     cell_style.leading = 10 if extra_names else 11
@@ -301,13 +308,13 @@ def _invitation_pdf(team, section, members):
     )
     story = [Paragraph(f"<b>{escape(section)} Team</b>", styles["Title"]), Spacer(1, 10)]
 
-    data = [["#", "Name", "Phone", "Account", "Date", "Sign", "Day"] + extra_names]
-    for idx, row in enumerate(_invitation_rows(members, extra_names), start=1):
+    data = [["#", "Name", "Phone"] + fixed_headers + extra_names]
+    for idx, row in enumerate(_invitation_rows(members, extra_names, visible_fixed), start=1):
         data.append([str(idx)] + [Paragraph(escape(str(x)), cell_style) for x in row])
     if len(data) == 1:
         data.append(["No records."] + [""] * (len(data[0]) - 1))
 
-    widths = [1.2 * cm, 6 * cm, 3.5 * cm, 4.5 * cm, 3 * cm, 4.5 * cm, 2.5 * cm] + [2.8 * cm] * len(extra_names)
+    widths = [1.2 * cm, 6 * cm, 3.5 * cm] + [fixed_widths_map[h] * cm for h in fixed_headers] + [2.8 * cm] * len(extra_names)
     max_w = 26.7 * cm
     total = sum(widths)
     if total > max_w:
