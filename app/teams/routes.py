@@ -287,6 +287,8 @@ def _invitation_excel(team, section, members, zones=None):
 
     extra_names = _invitation_extra_names(members)
     visible_fixed = _invitation_visible_fixed(members)
+    if section not in ("Invitation", "Participants"):
+        visible_fixed = visible_fixed | {"Sign"}
     fixed_headers = [h for h in ("Account", "Date", "Sign", "Day") if h in visible_fixed]
     fixed_widths = {"Account": 22, "Date": 14, "Sign": 18, "Day": 12}
 
@@ -345,6 +347,8 @@ def _invitation_pdf(team, section, members, zones=None):
 
     extra_names = _invitation_extra_names(members)
     visible_fixed = _invitation_visible_fixed(members)
+    if section not in ("Invitation", "Participants"):
+        visible_fixed = visible_fixed | {"Sign"}
     fixed_headers = [h for h in ("Account", "Date", "Sign", "Day") if h in visible_fixed]
     fixed_widths_map = {"Account": 4.5, "Date": 3, "Sign": 4.5, "Day": 2.5}
 
