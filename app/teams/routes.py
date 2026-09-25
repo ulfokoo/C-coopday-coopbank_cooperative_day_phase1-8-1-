@@ -244,15 +244,17 @@ def _invitation_excel(team, section, members):
     ws = wb.active
     ws.title = section[:31]
 
-    header_fill = PatternFill("solid", fgColor="1F4E3D")
-    header_font = Font(bold=True, color="FFFFFF")
+    body_font = Font(name="Arial Narrow", size=10)
+    header_fill = PatternFill("solid", fgColor="4472C4")
+    header_font = Font(name="Arial Narrow", size=10, bold=True, color="FFFFFF")
     thin = Side(style="thin", color="B7B7B7")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
     headers = ["S/no", "Name", "Phone"] + fixed_headers + extra_names
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
-    ws.cell(row=1, column=1, value=f"{section} Team").font = Font(bold=True, size=14)
+    ws.cell(row=1, column=1, value=f"{section} Team").font = Font(name="Arial Narrow", bold=True, size=14)
     ws.cell(row=1, column=1).alignment = center
 
     for col, h in enumerate(headers, start=1):
@@ -265,8 +267,9 @@ def _invitation_excel(team, section, members):
     for idx, row in enumerate(_invitation_rows(members, extra_names, visible_fixed), start=1):
         for col, val in enumerate([idx] + row, start=1):
             c = ws.cell(row=3 + idx, column=col, value=val)
+            c.font = body_font
             c.border = border
-            c.alignment = center
+            c.alignment = left
 
     widths = [6, 26, 16] + [fixed_widths[h] for h in fixed_headers] + [16] * len(extra_names)
     for i, w in enumerate(widths, start=1):
