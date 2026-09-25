@@ -275,7 +275,14 @@
       {% for m in members %}
         <tr>
           <td>{{ loop.index }}</td>
-          <td class="fw-semibold">{{ m.display_name }}</td>
+          <td>
+            {% if can_manage_members %}
+            <form method="POST" action="{{ url_for('teams.team_member_leader_name', team_id=team.id, member_id=m.id) }}">
+              {{ member_form.hidden_tag() }}
+              <input type="text" name="leader_name" value="{{ m.display_name }}" maxlength="150" class="form-control form-control-sm fw-semibold" style="width:20ch;" onchange="this.form.submit()">
+            </form>
+            {% else %}<span class="fw-semibold">{{ m.display_name }}</span>{% endif %}
+          </td>
           <td>
             {% if can_manage_members %}
             <form method="POST" action="{{ url_for('teams.team_member_window', team_id=team.id, member_id=m.id) }}">
