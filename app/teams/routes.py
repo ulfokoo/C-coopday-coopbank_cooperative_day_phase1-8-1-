@@ -366,7 +366,7 @@ def _invitation_pdf(team, section, members):
     )
 
 
-def _invitation_import(team, section, ws, mode="add"):
+def _invitation_import(team, section, ws, mode="add", zone=""):
     header_map = {
         "name": "name", "full name": "name",
         "phone": "phone", "phone number": "phone", "mobile": "phone",
@@ -425,6 +425,10 @@ def _invitation_import(team, section, ws, mode="add"):
     if not people:
         flash("No rows with a name were found in that file.", "warning")
         return _back(team.id, section)
+
+    if zone:
+        for p in people:
+            p["extra"]["District"] = zone
 
     existing_members = _section_query(team, section).all()
     existing_keys = {_norm_name(m.display_name) for m in existing_members}
@@ -531,6 +535,17 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
 
+    current_zone, zone_options = "", []
+    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
+        zone_options = sorted(
+            ({(m.extra_fields or {}).get("District", "").strip() for m in members} - {""})
+            | set(team.zone_labels or []),
+            key=str.lower,
+        )
+        current_zone = (request.args.get("zone") or "").strip()
+        if current_zone:
+            members = _apply_inv_filter(members, "x__District", current_zone)
+
     # Invitation tab: extra columns, red flags and paging (30 per page)
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
     inv_flags, inv_problems = {}, 0
@@ -580,6 +595,8 @@ def team_detail(team_id):
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
         can_edit_team=current_user.has_permission("manage_teams"),
+        current_zone=current_zone,
+        zone_options=zone_options,
     )
 
 
@@ -712,6 +729,7 @@ def team_import_excel(team_id):
     if section not in WINDOW_SECTIONS and section != "Participants" and section != "Registration Participants":
         section = WINDOW_SECTIONS[0]
     mode = request.form.get("mode", "add")   # "add" = merge/skip dupes, "replace" = wipe and reload
+    zone = (request.form.get("zone") or "").strip()
 
     file = request.files.get("excel_file")
     if not file or not file.filename:
@@ -730,7 +748,7 @@ def team_import_excel(team_id):
         return _back(team.id, section)
 
     if section in ("Invitation", "Participants", "Registration Participants"):
-        return _invitation_import(team, section, ws, mode=mode)
+        return _invitation_import(team, section, ws, mode=mode, zone=zone)
 
     # Map each column to a known field, or treat it as a new custom field.
     col_map = {}
@@ -828,6 +846,24 @@ def team_import_excel(team_id):
     db.session.commit()
     flash(f"Imported {len(groups)} leader(s) into {section}.", "success")
     return _back(team.id, section)
+
+
+@teams_bp.route("/<int:team_id>/zones/add", methods=["POST"])
+@login_required
+def team_zone_add(team_id):
+    team = Team.query.get_or_404(team_id)
+    if not _is_team_manager(team):
+        abort(403)
+    section = request.form.get("section")
+    name = (request.form.get("zone_name") or "").strip()[:60]
+    if name:
+        labels = list(team.zone_labels or [])
+        if name.lower() not in {l.lower() for l in labels}:
+            labels.append(name)
+            team.zone_labels = labels
+            log_action("update", "Team", team.id, f"Added zone tab '{name}'")
+            db.session.commit()
+    return redirect(url_for("teams.team_detail", team_id=team.id, section=section, zone=name))
 
 
 @teams_bp.route("/<int:team_id>/export.pdf")

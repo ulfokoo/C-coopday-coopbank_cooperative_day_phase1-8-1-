@@ -21,6 +21,7 @@ class Team(db.Model):
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     status = db.Column(db.String(20), default="Active", nullable=False)
+    zone_labels = db.Column(db.JSON, default=list)   # zone tabs added manually, e.g. ["East","South","Adama"]
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

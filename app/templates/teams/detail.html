@@ -73,6 +73,7 @@
         {{ member_form.hidden_tag() }}
         <input type="hidden" name="section" value="{{ current_section }}">
         <input type="hidden" name="mode" id="importModeInput" value="add">
+        <input type="hidden" name="zone" value="{{ current_zone }}">
         <input type="file" name="excel_file" id="importExcelInput" accept=".xlsx" class="d-none" onchange="document.getElementById('importExcelForm').submit()">
       </form>
       <div class="form-check form-check-inline mb-0 me-1" title="Leave unchecked so each CRM's upload adds to the list without deleting others' rows.">
@@ -88,12 +89,30 @@
           <i class="bi bi-download"></i> Download
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" id="invDownloadExcel" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
-          <li><a class="dropdown-item" id="invDownloadPdf" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
+          <li><a class="dropdown-item" id="invDownloadExcel" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section, filter_col='x__District' if current_zone else '', filter_val=current_zone or '') }}">Excel (.xlsx)</a></li>
+          <li><a class="dropdown-item" id="invDownloadPdf" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section, filter_col='x__District' if current_zone else '', filter_val=current_zone or '') }}">PDF</a></li>
         </ul>
       </div>
     </div>
   </div>
+  {% if zone_options is defined %}
+  <div class="px-3 pt-2 d-flex gap-1 align-items-center flex-wrap">
+    <a href="{{ url_for('teams.team_detail', team_id=team.id, section=current_section) }}"
+       class="btn btn-sm {{ 'btn-success' if not current_zone else 'btn-outline-secondary' }}">All</a>
+    {% for z in zone_options %}
+    <a href="{{ url_for('teams.team_detail', team_id=team.id, section=current_section, zone=z) }}"
+       class="btn btn-sm {{ 'btn-success' if current_zone == z else 'btn-outline-secondary' }}">{{ z }}</a>
+    {% endfor %}
+    {% if can_manage_members %}
+    <form method="POST" action="{{ url_for('teams.team_zone_add', team_id=team.id) }}" class="d-inline-flex gap-1 align-items-center ms-1">
+      {{ member_form.hidden_tag() }}
+      <input type="hidden" name="section" value="{{ current_section }}">
+      <input type="text" name="zone_name" class="form-control form-control-sm" style="width:120px;" placeholder="+ Add zone">
+      <button class="btn btn-sm btn-outline-secondary">Add</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
   <div class="px-3 pt-2 d-flex gap-2 align-items-center flex-wrap">
     <select id="invFilterColumn" class="form-select form-select-sm" style="width:auto;">
       <option value="">Filter by column&hellip;</option>
