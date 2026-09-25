@@ -83,11 +83,25 @@
           <i class="bi bi-download"></i> Download
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
+          <li><a class="dropdown-item" id="invDownloadExcel" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
+          <li><a class="dropdown-item" id="invDownloadPdf" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
         </ul>
       </div>
     </div>
+  </div>
+  <div class="px-3 pt-2 d-flex gap-2 align-items-center flex-wrap">
+    <select id="invFilterColumn" class="form-select form-select-sm" style="width:auto;">
+      <option value="">Filter by column&hellip;</option>
+      <option value="name">Name</option>
+      {% if 'Account' in inv_visible_fixed %}<option value="account">Account</option>{% endif %}
+      {% if 'Date' in inv_visible_fixed %}<option value="date">Date</option>{% endif %}
+      {% if 'Sign' in inv_visible_fixed %}<option value="sign">Sign</option>{% endif %}
+      {% if 'Day' in inv_visible_fixed %}<option value="day">Day</option>{% endif %}
+      {% for fname in inv_extra_names %}<option value="x__{{ fname }}">{{ fname }}</option>{% endfor %}
+    </select>
+    <input type="text" id="invFilterValue" class="form-control form-control-sm" style="width:200px;" placeholder="Value to filter...">
+    <button type="button" id="invFilterClear" class="btn btn-sm btn-outline-secondary" style="display:none;">Clear</button>
+    <span class="small text-muted">Download always exports the full filtered list, not just this page.</span>
   </div>
   <div class="px-3 pt-2 small text-muted">Rows in red need attention: repeated name, phone not 10 digits, or account not 13 digits.</div>
   <div class="table-responsive">
@@ -105,7 +119,7 @@
       {% for m in members %}
         {% set ex = m.extra_fields or {} %}
         {% set f = inv_flags.get(m.id, {}) %}
-        <tr id="inv-row-{{ m.id }}" class="{{ 'table-danger' if (f.name or f.extra_bad) else '' }}" data-member-id="{{ m.id }}">
+        <tr id="inv-row-{{ m.id }}" class="{{ 'table-danger' if (f.name or f.extra_bad) else '' }}" data-member-id="{{ m.id }}" data-name="{{ (m.member_name or '')|lower }}" data-extra='{{ (m.extra_fields or {})|tojson }}'>
           <td>
             {{ inv_offset + loop.index }}
             {% if can_manage_members %}
@@ -213,8 +227,8 @@
           <i class="bi bi-download"></i> Download
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
+          <li><a class="dropdown-item" id="invDownloadExcel" href="{{ url_for('teams.team_export_excel', team_id=team.id, section=current_section) }}">Excel (.xlsx)</a></li>
+          <li><a class="dropdown-item" id="invDownloadPdf" href="{{ url_for('teams.team_export_pdf', team_id=team.id, section=current_section) }}">PDF</a></li>
         </ul>
       </div>
     </div>
@@ -483,6 +497,61 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
     input.addEventListener("change", function () { save(input); });
+  });
+});
+
+// ---- Invitation filter: pick a column, type a value, narrow the visible rows
+//      and keep the Download links pointed at the same filtered set ----
+document.addEventListener("DOMContentLoaded", function () {
+  var colSelect = document.getElementById("invFilterColumn");
+  var valInput = document.getElementById("invFilterValue");
+  var clearBtn = document.getElementById("invFilterClear");
+  var excelLink = document.getElementById("invDownloadExcel");
+  var pdfLink = document.getElementById("invDownloadPdf");
+  if (!colSelect) return;
+
+  function getCellValue(row, col) {
+    if (col === "name") return row.dataset.name || "";
+    var extra = {};
+    try { extra = JSON.parse(row.dataset.extra || "{}"); } catch (e) {}
+    var keyMap = { account: "Account", date: "Date", sign: "Sign", day: "Day" };
+    if (col.indexOf("x__") === 0) return (extra[col.slice(3)] || "").toLowerCase();
+    return (extra[keyMap[col]] || "").toLowerCase();
+  }
+
+  function updateDownloadLinks(col, val) {
+    [excelLink, pdfLink].forEach(function (link) {
+      if (!link) return;
+      var url = new URL(link.href, window.location.origin);
+      if (col && val) {
+        url.searchParams.set("filter_col", col);
+        url.searchParams.set("filter_val", val);
+      } else {
+        url.searchParams.delete("filter_col");
+        url.searchParams.delete("filter_val");
+      }
+      link.href = url.pathname + url.search;
+    });
+  }
+
+  function applyFilter() {
+    var col = colSelect.value;
+    var val = valInput.value.trim().toLowerCase();
+    var active = !!(col && val);
+    clearBtn.style.display = active ? "" : "none";
+    document.querySelectorAll("tbody tr[data-member-id]").forEach(function (row) {
+      if (!active) { row.style.display = ""; return; }
+      row.style.display = getCellValue(row, col).indexOf(val) !== -1 ? "" : "none";
+    });
+    updateDownloadLinks(col, val);
+  }
+
+  colSelect.addEventListener("change", applyFilter);
+  valInput.addEventListener("input", applyFilter);
+  clearBtn.addEventListener("click", function () {
+    colSelect.value = "";
+    valInput.value = "";
+    applyFilter();
   });
 });
 

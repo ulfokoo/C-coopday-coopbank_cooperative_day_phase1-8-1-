@@ -230,6 +230,26 @@ def _invitation_rows(members, extra_names, visible_fixed):
     return rows
 
 
+def _apply_inv_filter(members, filter_col, filter_val):
+    """Narrow members down to the ones whose given column contains filter_val
+    (case-insensitive). Used by the Invitation/Participants filter box, both
+    for the on-page view and for Download so they always match."""
+    if not filter_col or not filter_val:
+        return members
+    val = filter_val.strip().lower()
+    key_map = {"account": "Account", "date": "Date", "sign": "Sign", "day": "Day"}
+
+    def get_val(m):
+        if filter_col == "name":
+            return (m.member_name or "").lower()
+        ex = m.extra_fields or {}
+        if filter_col.startswith("x__"):
+            return (ex.get(filter_col[3:], "") or "").lower()
+        return (ex.get(key_map.get(filter_col, ""), "") or "").lower()
+
+    return [m for m in members if val in get_val(m)]
+
+
 def _invitation_excel(team, section, members):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
@@ -558,6 +578,7 @@ def team_export_excel(team_id):
     if not _is_team_viewer(team):
         abort(403)
     use_windows, section, members = _export_context(team)
+    members = _apply_inv_filter(members, request.args.get("filter_col"), request.args.get("filter_val"))
 
     if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
         return _invitation_excel(team, section, members)
