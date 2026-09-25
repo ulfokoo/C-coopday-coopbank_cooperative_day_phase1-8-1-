@@ -69,7 +69,11 @@
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr>
-        <th>#</th><th>Name</th><th>Phone</th><th>Account</th><th>Date</th><th>Sign</th><th>Day</th>
+        <th>#</th><th>Name</th><th>Phone</th>
+        {% if 'Account' in inv_visible_fixed %}<th>Account</th>{% endif %}
+        {% if 'Date' in inv_visible_fixed %}<th>Date</th>{% endif %}
+        {% if 'Sign' in inv_visible_fixed %}<th>Sign</th>{% endif %}
+        {% if 'Day' in inv_visible_fixed %}<th>Day</th>{% endif %}
         {% for fname in inv_extra_names %}<th>{{ fname }}</th>{% endfor %}
         <th></th>
       </tr></thead>
@@ -77,7 +81,7 @@
       {% for m in members %}
         {% set ex = m.extra_fields or {} %}
         {% set f = inv_flags.get(m.id, {}) %}
-        <tr class="{{ 'table-danger' if f.name else '' }}" data-member-id="{{ m.id }}">
+        <tr class="{{ 'table-danger' if (f.name or f.extra_bad) else '' }}" data-member-id="{{ m.id }}">
           <td>
             {{ inv_offset + loop.index }}
             {% if can_manage_members %}
@@ -89,12 +93,21 @@
           {% if can_manage_members %}
           <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box inv-name {{ 'is-invalid' if f.name else '' }}" style="min-width:170px;"></td>
           <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="15" inputmode="numeric" placeholder="10 digits" class="form-control form-control-sm inv-box inv-phone {{ 'is-invalid' if f.phone else '' }}" style="min-width:130px;"></td>
+          {% if 'Account' in inv_visible_fixed %}
           <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="20" inputmode="numeric" placeholder="13 digits" class="form-control form-control-sm inv-box inv-account {{ 'is-invalid' if f.account else '' }}" style="min-width:150px;"></td>
+          {% endif %}
+          {% if 'Date' in inv_visible_fixed %}
           <td><input form="inv-{{ m.id }}" type="date" name="Date" value="{{ ex.get('Date', '') }}" class="form-control form-control-sm inv-box" style="min-width:140px;"></td>
+          {% endif %}
+          {% if 'Sign' in inv_visible_fixed %}
           <td><input form="inv-{{ m.id }}" type="text" name="Sign" value="{{ ex.get('Sign', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
+          {% endif %}
+          {% if 'Day' in inv_visible_fixed %}
           <td><input form="inv-{{ m.id }}" type="text" name="Day" value="{{ ex.get('Day', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:90px;"></td>
+          {% endif %}
           {% for fname in inv_extra_names %}
-          <td><input form="inv-{{ m.id }}" type="text" name="x__{{ fname }}" value="{{ ex.get(fname, '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
+          {% set is_acct = fname|lower|replace(' ', '') in ('account', 'acount', 'accountno', 'acctno', 'bankaccount') or 'acct' in fname|lower %}
+          <td><input form="inv-{{ m.id }}" type="text" name="x__{{ fname }}" value="{{ ex.get(fname, '') }}" maxlength="{{ 20 if is_acct else 100 }}" {% if is_acct %}inputmode="numeric" placeholder="13 digits"{% endif %} class="form-control form-control-sm inv-box inv-extra {{ 'is-invalid' if f.extra.get(fname) else '' }}" data-field="{{ fname }}" style="min-width:{{ '150px' if is_acct else '110px' }};"></td>
           {% endfor %}
           <td class="text-end">
             <form method="POST" action="{{ url_for('teams.team_member_remove', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this person?');">
@@ -106,10 +119,10 @@
           {% else %}
           <td>{{ m.display_name }}</td>
           <td>{{ m.phone or '—' }}</td>
-          <td>{{ ex.get('Account') or '—' }}</td>
-          <td>{{ ex.get('Date') or '—' }}</td>
-          <td>{{ ex.get('Sign') or '—' }}</td>
-          <td>{{ ex.get('Day') or '—' }}</td>
+          {% if 'Account' in inv_visible_fixed %}<td>{{ ex.get('Account') or '—' }}</td>{% endif %}
+          {% if 'Date' in inv_visible_fixed %}<td>{{ ex.get('Date') or '—' }}</td>{% endif %}
+          {% if 'Sign' in inv_visible_fixed %}<td>{{ ex.get('Sign') or '—' }}</td>{% endif %}
+          {% if 'Day' in inv_visible_fixed %}<td>{{ ex.get('Day') or '—' }}</td>{% endif %}
           {% for fname in inv_extra_names %}<td>{{ ex.get(fname) or '—' }}</td>{% endfor %}
           <td></td>
           {% endif %}
@@ -392,11 +405,22 @@ document.addEventListener("DOMContentLoaded", function () {
       accountBox.classList.toggle("is-invalid", !!(data.bad && data.bad.account));
     }
 
+    var rowHasExtraIssue = {};
+    document.querySelectorAll(".inv-extra").forEach(function (extraBox) {
+      var tr = extraBox.closest("tr");
+      var mid = Number(tr.dataset.memberId);
+      var ids = data.extra_bad_ids && data.extra_bad_ids[extraBox.dataset.field];
+      var isBad = !!(ids && ids.indexOf(mid) !== -1);
+      extraBox.classList.toggle("is-invalid", isBad);
+      if (isBad) rowHasExtraIssue[mid] = true;
+    });
+
     document.querySelectorAll(".inv-name").forEach(function (nameBox) {
       var tr = nameBox.closest("tr");
-      var isDupe = data.dupe_ids && data.dupe_ids.indexOf(Number(tr.dataset.memberId)) !== -1;
+      var mid = Number(tr.dataset.memberId);
+      var isDupe = data.dupe_ids && data.dupe_ids.indexOf(mid) !== -1;
       nameBox.classList.toggle("is-invalid", !!isDupe);
-      tr.classList.toggle("table-danger", !!isDupe);
+      tr.classList.toggle("table-danger", !!isDupe || !!rowHasExtraIssue[mid]);
     });
   }
 

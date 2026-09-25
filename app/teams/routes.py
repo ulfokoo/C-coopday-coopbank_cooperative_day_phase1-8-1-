@@ -131,19 +131,65 @@ def _norm_name(name):
     return " ".join((name or "").lower().split())
 
 
+def _norm_field(name):
+    """Strip everything but letters and lowercase, so 'Acount', 'Account #', 'ACC. NO' all match."""
+    return re.sub(r"[^a-z]", "", (name or "").lower())
+
+
+def _looks_like_account_field(fname):
+    """True for any extra column that is clearly meant to hold a bank account number,
+    including common typos/abbreviations like 'Acount' or 'Acct No'."""
+    n = _norm_field(fname)
+    return n in ("account", "acount", "accountno", "accountnumber", "acctno", "bankaccount") or "acct" in n
+
+
+def _extra_account_issues(all_members):
+    """For every extra-field column that looks like an account number, work out which member
+    ids have a value that is not exactly 13 digits, and which ids share a value with someone
+    else (accounts must be unique per person)."""
+    field_values = {}
+    for m in all_members:
+        ex = m.extra_fields or {}
+        for fname, val in ex.items():
+            val = (val or "").strip()
+            if _looks_like_account_field(fname) and val:
+                field_values.setdefault(fname, {})[m.id] = val
+
+    bad_ids, dup_ids = {}, {}
+    for fname, values in field_values.items():
+        counts = {}
+        for v in values.values():
+            counts[v] = counts.get(v, 0) + 1
+        bad_ids[fname] = {mid for mid, v in values.items() if _account_bad(v)}
+        dup_ids[fname] = {mid for mid, v in values.items() if counts[v] > 1}
+    return bad_ids, dup_ids
+
+
 def _invitation_flags(all_members):
-    """{member_id: {'name': dup?, 'phone': bad?, 'account': bad?}} for the WHOLE Invitation list."""
+    """{member_id: {'name': dup?, 'phone': bad?, 'account': bad?, 'extra': {fname: bad_or_dup?},
+    'extra_bad': any extra-field issue?}} for the WHOLE Invitation list."""
     counts = {}
     for m in all_members:
         key = _norm_name(m.display_name)
         counts[key] = counts.get(key, 0) + 1
+
+    bad_ids, dup_ids = _extra_account_issues(all_members)
+    extra_fields = set(bad_ids) | set(dup_ids)
+
     flags = {}
     for m in all_members:
         ex = m.extra_fields or {}
+        extra = {
+            fname: True
+            for fname in extra_fields
+            if m.id in bad_ids.get(fname, ()) or m.id in dup_ids.get(fname, ())
+        }
         flags[m.id] = {
             "name": counts[_norm_name(m.display_name)] > 1,
             "phone": _phone_bad(m.phone or ""),
             "account": _account_bad(ex.get("Account", "")),
+            "extra": extra,
+            "extra_bad": bool(extra),
         }
     return flags
 
@@ -151,6 +197,18 @@ def _invitation_flags(all_members):
 def _invitation_problem_count(flags):
     return sum(1 for f in flags.values() if any(f.values()))
 
+
+def _invitation_visible_fixed(all_members):
+    """Which of the built-in Account/Date/Sign/Day columns actually have data for at least
+    one person — so a column that was never in the uploaded file (e.g. no 'Date' column)
+    doesn't show up empty on the web page."""
+    present = set()
+    for m in all_members:
+        ex = m.extra_fields or {}
+        for key in INV_FIXED:
+            if (ex.get(key) or "").strip():
+                present.add(key)
+    return present
 
 def _invitation_extra_names(members):
     names = set()
@@ -434,9 +492,11 @@ def team_detail(team_id):
     # Invitation tab: extra columns, red flags and paging (30 per page)
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
     inv_flags, inv_problems = {}, 0
+    inv_visible_fixed = set()
     if use_windows and current_section == "Invitation":
         inv_total = len(members)
         inv_extra_names = _invitation_extra_names(members)
+        inv_visible_fixed = _invitation_visible_fixed(members)
         inv_flags = _invitation_flags(members)          # checked across ALL pages
         inv_problems = _invitation_problem_count(inv_flags)
         inv_pages = max(1, -(-inv_total // INV_PER_PAGE))
@@ -460,6 +520,7 @@ def team_detail(team_id):
         current_section=current_section,
         extra_field_names=extra_field_names,
         inv_extra_names=inv_extra_names,
+        inv_visible_fixed=inv_visible_fixed,
         inv_flags=inv_flags,
         inv_problems=inv_problems,
         inv_page=inv_page,
@@ -970,11 +1031,17 @@ def team_member_invite(team_id, member_id):
     everyone = _section_query(team, member.section or WINDOW_SECTIONS[0]).all()
     flags = _invitation_flags(everyone)
     mine = flags.get(member.id, {})
+    extra_bad_ids = {}
+    for i, f in flags.items():
+        for fname in f.get("extra", {}):
+            extra_bad_ids.setdefault(fname, []).append(i)
+
     return jsonify(
         phone=member.phone or "",
         account=data.get("Account", ""),
         bad={"phone": bool(mine.get("phone")), "account": bool(mine.get("account"))},
         dupe_ids=[i for i, f in flags.items() if f["name"]],
+        extra_bad_ids=extra_bad_ids,
         problems=_invitation_problem_count(flags),
     )
 
