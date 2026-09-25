@@ -221,7 +221,7 @@ def _invitation_rows(members, extra_names, visible_fixed):
     rows = []
     for m in members:
         ex = m.extra_fields or {}
-        row = [m.display_name, m.phone or ""]
+        row = [m.display_name]
         for key in ("Account", "Date", "Sign", "Day"):
             if key in visible_fixed:
                 row.append(ex.get(key, ""))
@@ -252,7 +252,7 @@ def _invitation_excel(team, section, members):
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
-    headers = ["S/no", "Name", "Phone"] + fixed_headers + extra_names
+    headers = ["S/no", "Name"] + fixed_headers + extra_names
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(row=1, column=1, value=f"{section} Team").font = Font(name="Arial Narrow", bold=True, size=14)
     ws.cell(row=1, column=1).alignment = center
@@ -311,7 +311,7 @@ def _invitation_pdf(team, section, members):
     )
     story = [Paragraph(f"<b>{escape(section)} Team</b>", styles["Title"]), Spacer(1, 10)]
 
-    data = [["#", "Name", "Phone"] + fixed_headers + extra_names]
+    data = [["#", "Name"] + fixed_headers + extra_names]
     for idx, row in enumerate(_invitation_rows(members, extra_names, visible_fixed), start=1):
         data.append([str(idx)] + [Paragraph(escape(str(x)), cell_style) for x in row])
     if len(data) == 1:

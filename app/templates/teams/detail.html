@@ -70,7 +70,7 @@
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr>
-        <th>#</th><th>Name</th><th>Phone</th>
+       <th>#</th><th>Name</th>
         {% if 'Account' in inv_visible_fixed %}<th>Account</th>{% endif %}
         {% if 'Date' in inv_visible_fixed %}<th>Date</th>{% endif %}
         {% if 'Sign' in inv_visible_fixed %}<th>Sign</th>{% endif %}
@@ -93,7 +93,6 @@
           </td>
           {% if can_manage_members %}
           <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box inv-name {{ 'is-invalid' if f.name else '' }}" style="min-width:170px;"></td>
-          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="15" inputmode="numeric" placeholder="10 digits" class="form-control form-control-sm inv-box inv-phone {{ 'is-invalid' if f.phone else '' }}" style="min-width:130px;"></td>
           {% if 'Account' in inv_visible_fixed %}
           <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="20" inputmode="numeric" placeholder="13 digits" class="form-control form-control-sm inv-box inv-account {{ 'is-invalid' if f.account else '' }}" style="min-width:150px;"></td>
           {% endif %}
