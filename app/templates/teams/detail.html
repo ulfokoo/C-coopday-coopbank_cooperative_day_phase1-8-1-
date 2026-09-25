@@ -7,6 +7,7 @@
   .drag-handle { cursor: grab; font-size: .85rem; }
   .staff-dropzone { min-height: 2.5rem; transition: background-color .12s; }
   .staff-dropzone.staff-dropzone-hover { background-color: #eaf3ff; outline: 2px dashed #4a90e2; outline-offset: -2px; }
+  .inv-flash { outline: 3px solid #dc3545; outline-offset: -2px; transition: outline-color 1.4s ease; }
 </style>
 {% endif %}
 {% endblock %}
@@ -41,7 +42,7 @@
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
     <span>Invitation &mdash; Guests <span class="text-muted fw-normal">({{ inv_total }})</span>
-      {% if inv_problems %}<span class="badge bg-danger ms-1">{{ inv_problems }} to fix</span>{% endif %}
+      {% if inv_problems %}<button type="button" id="inv-next-issue" class="badge bg-danger ms-1 border-0" style="cursor:pointer;">{{ inv_problems }} to fix &rsaquo;</button>{% endif %}
     </span>
     <div class="d-flex gap-2">
       {% if can_manage_members %}
@@ -81,7 +82,7 @@
       {% for m in members %}
         {% set ex = m.extra_fields or {} %}
         {% set f = inv_flags.get(m.id, {}) %}
-        <tr class="{{ 'table-danger' if (f.name or f.extra_bad) else '' }}" data-member-id="{{ m.id }}">
+        <tr id="inv-row-{{ m.id }}" class="{{ 'table-danger' if (f.name or f.extra_bad) else '' }}" data-member-id="{{ m.id }}">
           <td>
             {{ inv_offset + loop.index }}
             {% if can_manage_members %}
@@ -449,6 +450,53 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     input.addEventListener("change", function () { save(input); });
   });
+});
+
+// ---- "N to fix" button: jump to each flagged Invitation row one at a time,
+//      even across pages, and focus its first bad box ----
+document.addEventListener("DOMContentLoaded", function () {
+  var btn = document.getElementById("inv-next-issue");
+  var problems = {{ (inv_problem_ids or [])|tojson }};
+  var storeKey = "invIssueIdx_{{ team.id }}";
+
+  function goToProblem(idx) {
+    if (!problems.length) return;
+    idx = ((idx % problems.length) + problems.length) % problems.length;
+    var target = problems[idx];
+    sessionStorage.setItem(storeKey, String(idx));
+    var currentPage = {{ inv_page or 1 }};
+    if (target.page !== currentPage) {
+      var url = new URL(window.location.href);
+      url.searchParams.set("page", target.page);
+      url.hash = "inv-row-" + target.id;
+      window.location.href = url.toString();
+      return;
+    }
+    highlightRow(target.id);
+  }
+
+  function highlightRow(memberId) {
+    var row = document.getElementById("inv-row-" + memberId);
+    if (!row) return;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("inv-flash");
+    setTimeout(function () { row.classList.remove("inv-flash"); }, 1600);
+    var firstBad = row.querySelector(".is-invalid");
+    if (firstBad) { firstBad.focus(); if (firstBad.select) firstBad.select(); }
+  }
+
+  if (btn) {
+    btn.addEventListener("click", function () {
+      var idx = parseInt(sessionStorage.getItem(storeKey) || "-1", 10);
+      goToProblem(idx + 1);
+    });
+  }
+
+  // Arrived here via a page jump from goToProblem — scroll to the row the hash points at.
+  if (window.location.hash.indexOf("#inv-row-") === 0) {
+    var id = window.location.hash.replace("#inv-row-", "");
+    setTimeout(function () { highlightRow(id); }, 150);
+  }
 });
 
 {% if use_windows and can_manage_members %}

@@ -503,6 +503,7 @@ def team_detail(team_id):
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
     inv_flags, inv_problems = {}, 0
     inv_visible_fixed = set()
+    inv_problem_ids = []
     if use_windows and current_section == "Invitation":
         inv_total = len(members)
         inv_extra_names = _invitation_extra_names(members)
@@ -512,6 +513,11 @@ def team_detail(team_id):
         inv_pages = max(1, -(-inv_total // INV_PER_PAGE))
         inv_page = min(max(request.args.get("page", 1, type=int), 1), inv_pages)
         inv_offset = (inv_page - 1) * INV_PER_PAGE
+        inv_problem_ids = [
+            {"id": m.id, "page": (idx // INV_PER_PAGE) + 1}
+            for idx, m in enumerate(members)
+            if any(inv_flags.get(m.id, {}).values())
+        ]
         members = members[inv_offset:inv_offset + INV_PER_PAGE]
 
     extra_field_names = []
@@ -532,6 +538,7 @@ def team_detail(team_id):
         inv_extra_names=inv_extra_names,
         inv_visible_fixed=inv_visible_fixed,
         inv_flags=inv_flags,
+        inv_problem_ids=inv_problem_ids,
         inv_problems=inv_problems,
         inv_page=inv_page,
         inv_pages=inv_pages,
