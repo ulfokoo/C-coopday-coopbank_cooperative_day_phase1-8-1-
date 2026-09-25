@@ -544,7 +544,16 @@ def team_detail(team_id):
         members.sort(key=_window_sort_key)
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
-
+    current_zones, zone_options = [], []
+    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
+        zone_options = sorted(
+            ({(m.extra_fields or {}).get("District", "").strip() for m in members} - {""})
+            | set(team.zone_labels or []),
+            key=str.lower,
+        )
+        current_zones = [z for z in request.args.getlist("zone") if z.strip()]
+        if current_zones:
+            members = _apply_zone_filter(members, current_zones)
 
     # Invitation tab: extra columns, red flags and paging (30 per page)
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
