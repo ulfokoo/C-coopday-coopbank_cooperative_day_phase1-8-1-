@@ -94,35 +94,62 @@ def _cell_text(val):
     return str(val).strip()
 
 
-def _clean_phone(raw):
-    """Returns (value, error). Phone must be exactly 10 digits.
-    Excel often drops the leading 0 (911478198) or people type +251...; both are fixed."""
+def _tidy_phone(raw):
+    """Light clean-up only, never rejects. Removes spaces/dashes, turns +251... into 0...,
+    and puts back the leading 0 that Excel drops (911478198 -> 0911478198)."""
     raw = (raw or "").strip()
     if not raw:
-        return "", None
+        return ""
     d = re.sub(r"[\s\-().]", "", raw)
     if d.startswith("+"):
         d = d[1:]
-    if not d.isdigit():
-        return None, "Phone must contain digits only."
-    if d.startswith("251") and len(d) == 12:
-        d = "0" + d[3:]
-    elif len(d) == 9 and not d.startswith("0"):
-        d = "0" + d
-    if len(d) != 10:
-        return None, "Phone must be exactly 10 digits."
-    return d, None
+    if d.isdigit():
+        if d.startswith("251") and len(d) == 12:
+            d = "0" + d[3:]
+        elif len(d) == 9 and not d.startswith("0"):
+            d = "0" + d
+    return d[:15]
 
 
-def _clean_account(raw):
-    """Returns (value, error). Account must be exactly 13 digits."""
-    raw = (raw or "").strip()
-    if not raw:
-        return "", None
-    d = re.sub(r"[\s\-]", "", raw)
-    if not d.isdigit() or len(d) != 13:
-        return None, "Account must be exactly 13 digits."
-    return d, None
+def _tidy_account(raw):
+    """Light clean-up only, never rejects. Removes spaces and dashes."""
+    return re.sub(r"[\s\-]", "", (raw or "").strip())[:20]
+
+
+def _phone_bad(value):
+    """True when a phone is filled in but is not exactly 10 digits."""
+    return bool(value) and not (value.isdigit() and len(value) == 10)
+
+
+def _account_bad(value):
+    """True when an account is filled in but is not exactly 13 digits."""
+    return bool(value) and not (value.isdigit() and len(value) == 13)
+
+
+def _norm_name(name):
+    """'  Abebe   KEBEDE ' -> 'abebe kebede' so first/middle/last names are compared as a whole."""
+    return " ".join((name or "").lower().split())
+
+
+def _invitation_flags(all_members):
+    """{member_id: {'name': dup?, 'phone': bad?, 'account': bad?}} for the WHOLE Invitation list."""
+    counts = {}
+    for m in all_members:
+        key = _norm_name(m.display_name)
+        counts[key] = counts.get(key, 0) + 1
+    flags = {}
+    for m in all_members:
+        ex = m.extra_fields or {}
+        flags[m.id] = {
+            "name": counts[_norm_name(m.display_name)] > 1,
+            "phone": _phone_bad(m.phone or ""),
+            "account": _account_bad(ex.get("Account", "")),
+        }
+    return flags
+
+
+def _invitation_problem_count(flags):
+    return sum(1 for f in flags.values() if any(f.values()))
 
 
 def _invitation_extra_names(members):
@@ -280,7 +307,7 @@ def _invitation_import(team, section, ws):
         flash("Could not find a 'Name' column in the first rows of that file.", "danger")
         return _back(team.id, section)
 
-    people, problems = [], []
+    people = []
     for row in ws.iter_rows(min_row=header_row + 1):
         vals, extra = {}, {}
         for cell in row:
@@ -296,24 +323,19 @@ def _invitation_import(team, section, ws):
         if not vals.get("name"):
             continue
 
-        row_no = row[0].row
-        phone, p_err = _clean_phone(vals.get("phone"))
-        account, a_err = _clean_account(vals.get("Account"))
-        if p_err or a_err:
-            problems.append(f"row {row_no} ({p_err or a_err})")
-            continue
-
         info = {k: vals[k][:100] for k in ("Date", "Sign", "Day") if vals.get(k)}
+        account = _tidy_account(vals.get("Account"))
         if account:
             info["Account"] = account
         info.update(extra)
-        people.append({"name": vals["name"][:150], "phone": phone, "extra": info})
+        people.append({
+            "name": vals["name"][:150],
+            "phone": _tidy_phone(vals.get("phone")),
+            "extra": info,
+        })
 
     if not people:
-        msg = "No valid rows found in that file."
-        if problems:
-            msg += " Problems: " + "; ".join(problems[:5])
-        flash(msg, "danger")
+        flash("No rows with a name were found in that file.", "warning")
         return _back(team.id, section)
 
     for m in _section_query(team, section).all():
@@ -332,11 +354,13 @@ def _invitation_import(team, section, ws):
     log_action("update", "Team", team.id, f"Imported {section} list from Excel ({len(people)} people)")
     db.session.commit()
 
+    problems = _invitation_problem_count(
+        _invitation_flags(_section_query(team, section).all())
+    )
     if problems:
-        more = f" (+{len(problems) - 5} more)" if len(problems) > 5 else ""
         flash(
-            f"Imported {len(people)} people. Skipped {len(problems)} row(s): "
-            + "; ".join(problems[:5]) + more,
+            f"Imported {len(people)} people. {problems} row(s) need attention and are shown in red "
+            f"(repeated name, phone not 10 digits, or account not 13 digits).",
             "warning",
         )
     else:
@@ -407,11 +431,14 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
 
-    # Invitation tab: extra columns + paging (30 per page)
+    # Invitation tab: extra columns, red flags and paging (30 per page)
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
+    inv_flags, inv_problems = {}, 0
     if use_windows and current_section == "Invitation":
         inv_total = len(members)
         inv_extra_names = _invitation_extra_names(members)
+        inv_flags = _invitation_flags(members)          # checked across ALL pages
+        inv_problems = _invitation_problem_count(inv_flags)
         inv_pages = max(1, -(-inv_total // INV_PER_PAGE))
         inv_page = min(max(request.args.get("page", 1, type=int), 1), inv_pages)
         inv_offset = (inv_page - 1) * INV_PER_PAGE
@@ -433,6 +460,8 @@ def team_detail(team_id):
         current_section=current_section,
         extra_field_names=extra_field_names,
         inv_extra_names=inv_extra_names,
+        inv_flags=inv_flags,
+        inv_problems=inv_problems,
         inv_page=inv_page,
         inv_pages=inv_pages,
         inv_offset=inv_offset,
@@ -769,8 +798,8 @@ def team_export_pdf(team_id):
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#B7B7B7")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
     ] + spans
     table.setStyle(TableStyle(style_cmds))
@@ -820,10 +849,12 @@ def team_member_add(team_id):
     if form.validate_on_submit():
         pool = _section_query(team, section) if section else team.members
         existing = {(m.member_name or "").strip().lower() for m in pool}
+        # Invitation: the same name may be added twice on purpose; it is then shown in red.
+        allow_dupes = section == "Invitation"
         added = 0
         for line in form.names.data.splitlines():
             name = line.strip()
-            if not name or name.lower() in existing:
+            if not name or (not allow_dupes and name.lower() in existing):
                 continue
             db.session.add(TeamMember(
                 team_id=team.id, member_name=name[:150],
@@ -898,23 +929,19 @@ def team_member_field(team_id, member_id):
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/invite", methods=["POST"])
 @login_required
 def team_member_invite(team_id, member_id):
+    """Save one Invitation row. Nothing is rejected: wrong phone/account values are saved
+    as typed and simply shown in red (see _invitation_flags)."""
     team = Team.query.get_or_404(team_id)
     if not _is_team_manager(team):
         abort(403)
     member = TeamMember.query.filter_by(id=member_id, team_id=team_id).first_or_404()
-
-    errors = {}
 
     name = (request.form.get("member_name") or "").strip()
     if name:
         member.member_name = name[:150]
 
     if "phone" in request.form:
-        phone, err = _clean_phone(request.form.get("phone"))
-        if err:
-            errors["phone"] = err
-        else:
-            member.phone = phone or None
+        member.phone = _tidy_phone(request.form.get("phone")) or None
 
     data = dict(member.extra_fields or {})
 
@@ -922,13 +949,7 @@ def team_member_invite(team_id, member_id):
         if key not in request.form:
             continue
         raw = request.form.get(key)
-        if key == "Account":
-            val, err = _clean_account(raw)
-            if err:
-                errors["Account"] = err
-                continue
-        else:
-            val = (raw or "").strip()[:100]
+        val = _tidy_account(raw) if key == "Account" else (raw or "").strip()[:100]
         if val:
             data[key] = val
         else:
@@ -946,9 +967,16 @@ def team_member_invite(team_id, member_id):
     member.extra_fields = data or None
     db.session.commit()
 
-    if errors:
-        return jsonify(errors=errors), 422
-    return jsonify(saved={"phone": member.phone or "", "Account": data.get("Account", "")}), 200
+    everyone = _section_query(team, member.section or WINDOW_SECTIONS[0]).all()
+    flags = _invitation_flags(everyone)
+    mine = flags.get(member.id, {})
+    return jsonify(
+        phone=member.phone or "",
+        account=data.get("Account", ""),
+        bad={"phone": bool(mine.get("phone")), "account": bool(mine.get("account"))},
+        dupe_ids=[i for i, f in flags.items() if f["name"]],
+        problems=_invitation_problem_count(flags),
+    )
 
 
 @teams_bp.route("/<int:team_id>/members/<int:member_id>/district", methods=["POST"])

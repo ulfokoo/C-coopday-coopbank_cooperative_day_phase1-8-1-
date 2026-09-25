@@ -40,7 +40,9 @@
 {% if current_section == 'Invitation' %}
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-    <span>Invitation &mdash; Guests <span class="text-muted fw-normal">({{ inv_total }})</span></span>
+    <span>Invitation &mdash; Guests <span class="text-muted fw-normal">({{ inv_total }})</span>
+      {% if inv_problems %}<span class="badge bg-danger ms-1">{{ inv_problems }} to fix</span>{% endif %}
+    </span>
     <div class="d-flex gap-2">
       {% if can_manage_members %}
       <form method="POST" action="{{ url_for('teams.team_import_excel', team_id=team.id, section=current_section) }}" enctype="multipart/form-data" id="importExcelForm">
@@ -63,7 +65,7 @@
       </div>
     </div>
   </div>
-  <div id="invMsg" class="text-danger small px-3 pt-2"></div>
+  <div class="px-3 pt-2 small text-muted">Rows in red need attention: repeated name, phone not 10 digits, or account not 13 digits.</div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr>
@@ -74,7 +76,8 @@
       <tbody>
       {% for m in members %}
         {% set ex = m.extra_fields or {} %}
-        <tr>
+        {% set f = inv_flags.get(m.id, {}) %}
+        <tr class="{{ 'table-danger' if f.name else '' }}" data-member-id="{{ m.id }}">
           <td>
             {{ inv_offset + loop.index }}
             {% if can_manage_members %}
@@ -84,9 +87,9 @@
             {% endif %}
           </td>
           {% if can_manage_members %}
-          <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box" style="min-width:170px;"></td>
-          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="15" inputmode="numeric" placeholder="10 digits" class="form-control form-control-sm inv-box" style="min-width:130px;"></td>
-          <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="20" inputmode="numeric" placeholder="13 digits" class="form-control form-control-sm inv-box" style="min-width:150px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="member_name" value="{{ m.member_name or '' }}" maxlength="150" class="form-control form-control-sm inv-box inv-name {{ 'is-invalid' if f.name else '' }}" style="min-width:170px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="phone" value="{{ m.phone or '' }}" maxlength="15" inputmode="numeric" placeholder="10 digits" class="form-control form-control-sm inv-box inv-phone {{ 'is-invalid' if f.phone else '' }}" style="min-width:130px;"></td>
+          <td><input form="inv-{{ m.id }}" type="text" name="Account" value="{{ ex.get('Account', '') }}" maxlength="20" inputmode="numeric" placeholder="13 digits" class="form-control form-control-sm inv-box inv-account {{ 'is-invalid' if f.account else '' }}" style="min-width:150px;"></td>
           <td><input form="inv-{{ m.id }}" type="date" name="Date" value="{{ ex.get('Date', '') }}" class="form-control form-control-sm inv-box" style="min-width:140px;"></td>
           <td><input form="inv-{{ m.id }}" type="text" name="Sign" value="{{ ex.get('Sign', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:110px;"></td>
           <td><input form="inv-{{ m.id }}" type="text" name="Day" value="{{ ex.get('Day', '') }}" maxlength="100" class="form-control form-control-sm inv-box" style="min-width:90px;"></td>
@@ -365,53 +368,50 @@ document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".action-note-box, .window-box").forEach(autoResizeActionNote);
 });
 
-// ---- Invitation table: save each row in the background, Enter moves to the next box ----
+// ---- Invitation table: save each row in the background, Enter moves to the next box,
+//      red highlight for repeated names / bad phone / bad account ----
 document.addEventListener("DOMContentLoaded", function () {
   var boxes = Array.from(document.querySelectorAll(".inv-box"));
-  var msg = document.getElementById("invMsg");
+  if (!boxes.length) return;
 
   function ok(input) {
     input.classList.add("is-valid");
     setTimeout(function () { input.classList.remove("is-valid"); }, 1200);
-    if (msg && !document.querySelector(".inv-box.is-invalid")) msg.textContent = "";
+  }
+
+  function applyResult(input, data) {
+    var row = input.closest("tr");
+
+    var phoneBox = row.querySelector(".inv-phone");
+    if (phoneBox) {
+      if (input.name === "phone" && data.phone !== undefined) phoneBox.value = data.phone;
+      phoneBox.classList.toggle("is-invalid", !!(data.bad && data.bad.phone));
+    }
+    var accountBox = row.querySelector(".inv-account");
+    if (accountBox) {
+      accountBox.classList.toggle("is-invalid", !!(data.bad && data.bad.account));
+    }
+
+    document.querySelectorAll(".inv-name").forEach(function (nameBox) {
+      var tr = nameBox.closest("tr");
+      var isDupe = data.dupe_ids && data.dupe_ids.indexOf(Number(tr.dataset.memberId)) !== -1;
+      nameBox.classList.toggle("is-invalid", !!isDupe);
+      tr.classList.toggle("table-danger", !!isDupe);
+    });
   }
 
   function save(input) {
     var form = input.form;
     if (!form) return;
-    input.classList.remove("is-invalid");
     fetch(form.action, {
       method: "POST",
       body: new FormData(form),
       headers: { "X-Requested-With": "fetch" },
       credentials: "same-origin"
     })
-      .then(function (r) {
-        return r.json().then(function (j) { return { status: r.status, json: j }; });
-      })
-      .then(function (res) {
-        if (res.status === 200) {
-          var saved = res.json.saved || {};
-          if (input.name === "phone" && saved.phone !== undefined) input.value = saved.phone;
-          ok(input);
-        } else if (res.status === 422) {
-          var err = res.json.errors && res.json.errors[input.name];
-          if (err) {
-            input.classList.add("is-invalid");
-            var row = input.closest("tr");
-            var nameBox = row ? row.querySelector("input[name=member_name]") : null;
-            if (msg) msg.textContent = (nameBox ? nameBox.value + ": " : "") + err;
-          } else {
-            ok(input);
-          }
-        } else {
-          throw new Error("save failed");
-        }
-      })
-      .catch(function () {
-        input.classList.add("is-invalid");
-        if (msg) msg.textContent = "Could not save. Please try again.";
-      });
+      .then(function (r) { return r.json(); })
+      .then(function (data) { applyResult(input, data); ok(input); })
+      .catch(function () { input.classList.add("is-invalid"); });
   }
 
   boxes.forEach(function (input, i) {
