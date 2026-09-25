@@ -244,15 +244,21 @@ def _invitation_rows(members, extra_names, visible_fixed):
     return rows
 
 
+def _member_zone_value(m):
+    """Read a member's zone from whichever key the sheet used (Zone, ZONE, or District)."""
+    extra = m.extra_fields or {}
+    for k, v in extra.items():
+        if k.strip().lower() in ("zone", "district") and v and v.strip():
+            return v.strip()
+    return ""
+
+
 def _apply_zone_filter(members, zones):
-    """Keep only members whose District exactly matches one of the given zone names."""
+    """Keep only members whose Zone/District exactly matches one of the given zone names."""
     zone_set = {z.strip().lower() for z in zones if z and z.strip()}
     if not zone_set:
         return members
-    return [
-        m for m in members
-        if ((m.extra_fields or {}).get("District", "") or "").strip().lower() in zone_set
-    ]
+    return [m for m in members if _member_zone_value(m).lower() in zone_set]
 
 def _apply_inv_filter(members, filter_col, filter_val):
     """Narrow members down to the ones whose given column contains filter_val
@@ -583,7 +589,7 @@ def team_detail(team_id):
     current_zones, zone_options = [], []
     if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
         zone_options = sorted(
-            ({(m.extra_fields or {}).get("District", "").strip() for m in members} - {""})
+            ({_member_zone_value(m) for m in members} - {""})
             | set(team.zone_labels or []),
             key=str.lower,
         )
