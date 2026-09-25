@@ -591,7 +591,7 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
     current_zones, zone_options = [], []
-    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
+    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants", "Per-diem"):
         zone_options = sorted(
             ({_member_zone_value(m) for m in members} - {""})
             | set(team.zone_labels or []),
