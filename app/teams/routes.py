@@ -459,6 +459,21 @@ def _invitation_import(team, section, ws, mode="add", zone=""):
         for p in people:
             p["extra"]["District"] = zone
 
+    # Auto-create zone tabs for any Zone/District values found in the sheet.
+    zone_keys = {k for p in people for k in p["extra"] if k.strip().lower() in ("zone", "district")}
+    found_zones = {
+        p["extra"][k].strip()
+        for p in people for k in zone_keys
+        if p["extra"].get(k, "").strip()
+    }
+    existing_labels = {l.lower() for l in (team.zone_labels or [])}
+    new_zones = sorted(z for z in found_zones if z.lower() not in existing_labels)
+    if new_zones:
+        labels = list(team.zone_labels or [])
+        labels.extend(new_zones)
+        team.zone_labels = labels
+        log_action("update", "Team", team.id, f"Auto-created zone tab(s): {', '.join(new_zones)}")
+
     existing_members = _section_query(team, section).all()
     existing_keys = {_norm_name(m.display_name) for m in existing_members}
 
@@ -494,6 +509,8 @@ def _invitation_import(team, section, ws, mode="add", zone=""):
     msg = f"Added {added} new participant(s)."
     if skipped:
         msg += f" Skipped {skipped} already on the list."
+    if new_zones:
+        msg += f" Created {len(new_zones)} new zone tab(s): {', '.join(new_zones)}."
     if problems:
         flash(msg + f" {problems} row(s) need attention (repeated name, phone not 10 digits, or account not 13 digits).", "warning")
     else:
