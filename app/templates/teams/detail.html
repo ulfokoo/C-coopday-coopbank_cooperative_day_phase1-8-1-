@@ -32,16 +32,27 @@
 <ul class="nav nav-pills mb-3">
   {% for s in sections %}
   <li class="nav-item">
-    <a class="nav-link {{ 'active' if s == current_section else '' }}"
+    <a class="nav-link {{ 'active' if (s == current_section) or (s == 'Invitation' and current_section == 'Participants') else '' }}"
        href="{{ url_for('teams.team_detail', team_id=team.id, section=s) }}">{{ s }}</a>
   </li>
   {% endfor %}
 </ul>
 
-{% if current_section == 'Invitation' %}
+{% if current_section in ('Invitation', 'Participants') %}
+<ul class="nav nav-pills mb-3" style="--bs-nav-pills-link-active-bg:#6c757d;">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if current_section == 'Invitation' else '' }}"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation') }}">Organizations</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if current_section == 'Participants' else '' }}"
+       href="{{ url_for('teams.team_detail', team_id=team.id, section='Participants') }}">Participants</a>
+  </li>
+</ul>
+
 <div class="card mb-4">
   <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-    <span>Invitation &mdash; Guests <span class="text-muted fw-normal">({{ inv_total }})</span>
+    <span>{{ current_section }} &mdash; {{ 'Organizations' if current_section == 'Invitation' else 'Participants' }} <span class="text-muted fw-normal">({{ inv_total }})</span>
       {% if inv_problems %}<button type="button" id="inv-next-issue" class="badge bg-danger ms-1 border-0" style="cursor:pointer;">{{ inv_problems }} to fix &rsaquo;</button>{% endif %}
     </span>
     <div class="d-flex gap-2">
@@ -141,15 +152,15 @@
     <nav>
       <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center">
         <li class="page-item {{ 'disabled' if inv_page <= 1 else '' }}">
-          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=inv_page - 1) }}">&laquo;</a>
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section=current_section, page=inv_page - 1) }}">&laquo;</a>
         </li>
         {% for p in range(1, inv_pages + 1) %}
         <li class="page-item {{ 'active' if p == inv_page else '' }}">
-          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=p) }}">{{ p }}</a>
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section=current_section, page=p) }}">{{ p }}</a>
         </li>
         {% endfor %}
         <li class="page-item {{ 'disabled' if inv_page >= inv_pages else '' }}">
-          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section='Invitation', page=inv_page + 1) }}">&raquo;</a>
+          <a class="page-link" href="{{ url_for('teams.team_detail', team_id=team.id, section=current_section, page=inv_page + 1) }}">&raquo;</a>
         </li>
       </ul>
     </nav>
@@ -334,7 +345,7 @@
 
 {% if can_manage_members %}
 <div class="card">
-  <div class="card-header bg-white fw-bold">{% if use_windows %}{{ 'Add People to Invitation' if current_section == 'Invitation' else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
+  {% if use_windows %}{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
