@@ -136,6 +136,20 @@ def _norm_field(name):
     return re.sub(r"[^a-z]", "", (name or "").lower())
 
 
+def _looks_like_name_field(fname):
+    """True for a header that clearly means the person's own name, e.g. 'Name',
+    'Full Name', 'Name of participants' — but NOT 'Name of Cooperative/Orgn',
+    which is a different, unrelated field."""
+    n = _norm_field(fname)
+    if n in ("name", "fullname"):
+        return True
+    if "name" in n and not any(
+        x in n for x in ("cooperative", "coop", "organisation", "organization", "orgn", "org", "union", "bank")
+    ):
+        return True
+    return False
+
+
 def _looks_like_account_field(fname):
     """True for any extra column that is clearly meant to hold a bank account number,
     including common typos/abbreviations like 'Acount' or 'Acct No'."""
@@ -389,14 +403,19 @@ def _invitation_import(team, section, ws, mode="add", zone=""):
 
     col_map = {}
     header_row = None
-    for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=6), start=1):
+    for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=20), start=1):
         found = {}
         for cell in row:
             text_ = _cell_text(cell.value)
             key = text_.lower()
             if not text_ or key in skip_headers:
                 continue
-            found[cell.column] = header_map.get(key) or ("extra", text_[:60])
+            if key in header_map:
+                found[cell.column] = header_map[key]
+            elif _looks_like_name_field(text_):
+                found[cell.column] = "name"
+            else:
+                found[cell.column] = ("extra", text_[:60])
         if "name" in found.values():
             col_map, header_row = found, r_idx
             break
