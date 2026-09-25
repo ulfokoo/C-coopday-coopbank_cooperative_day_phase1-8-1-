@@ -230,6 +230,16 @@ def _invitation_rows(members, extra_names, visible_fixed):
     return rows
 
 
+def _apply_zone_filter(members, zones):
+    """Keep only members whose District exactly matches one of the given zone names."""
+    zone_set = {z.strip().lower() for z in zones if z and z.strip()}
+    if not zone_set:
+        return members
+    return [
+        m for m in members
+        if ((m.extra_fields or {}).get("District", "") or "").strip().lower() in zone_set
+    ]
+
 def _apply_inv_filter(members, filter_col, filter_val):
     """Narrow members down to the ones whose given column contains filter_val
     (case-insensitive). Used by the Invitation/Participants filter box, both
@@ -535,16 +545,6 @@ def team_detail(team_id):
     else:
         members = team.members.filter_by(parent_id=None).order_by(TeamMember.id).all()
 
-    current_zone, zone_options = "", []
-    if use_windows and current_section in ("Invitation", "Participants", "Registration Participants"):
-        zone_options = sorted(
-            ({(m.extra_fields or {}).get("District", "").strip() for m in members} - {""})
-            | set(team.zone_labels or []),
-            key=str.lower,
-        )
-        current_zone = (request.args.get("zone") or "").strip()
-        if current_zone:
-            members = _apply_inv_filter(members, "x__District", current_zone)
 
     # Invitation tab: extra columns, red flags and paging (30 per page)
     inv_extra_names, inv_page, inv_pages, inv_offset, inv_total = [], 1, 1, 0, 0
@@ -595,7 +595,7 @@ def team_detail(team_id):
         member_form=member_form,
         can_manage_members=_is_team_manager(team),
         can_edit_team=current_user.has_permission("manage_teams"),
-        current_zone=current_zone,
+        current_zones=current_zones,
         zone_options=zone_options,
     )
 
@@ -608,6 +608,7 @@ def team_export_excel(team_id):
         abort(403)
     use_windows, section, members = _export_context(team)
     members = _apply_inv_filter(members, request.args.get("filter_col"), request.args.get("filter_val"))
+    members = _apply_zone_filter(members, request.args.getlist("zone"))
 
     if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
         return _invitation_excel(team, section, members)
@@ -848,6 +849,9 @@ def team_import_excel(team_id):
     return _back(team.id, section)
 
 
+
+
+
 @teams_bp.route("/<int:team_id>/zones/add", methods=["POST"])
 @login_required
 def team_zone_add(team_id):
@@ -856,6 +860,7 @@ def team_zone_add(team_id):
         abort(403)
     section = request.form.get("section")
     name = (request.form.get("zone_name") or "").strip()[:60]
+    selected = [z for z in request.form.getlist("zone") if z.strip()]
     if name:
         labels = list(team.zone_labels or [])
         if name.lower() not in {l.lower() for l in labels}:
@@ -863,7 +868,9 @@ def team_zone_add(team_id):
             team.zone_labels = labels
             log_action("update", "Team", team.id, f"Added zone tab '{name}'")
             db.session.commit()
-    return redirect(url_for("teams.team_detail", team_id=team.id, section=section, zone=name))
+        if name not in selected:
+            selected.append(name)
+    return redirect(url_for("teams.team_detail", team_id=team.id, section=section, zone=selected))
 
 
 @teams_bp.route("/<int:team_id>/export.pdf")
