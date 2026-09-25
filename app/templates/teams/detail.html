@@ -72,8 +72,13 @@
       <form method="POST" action="{{ url_for('teams.team_import_excel', team_id=team.id, section=current_section) }}" enctype="multipart/form-data" id="importExcelForm">
         {{ member_form.hidden_tag() }}
         <input type="hidden" name="section" value="{{ current_section }}">
+        <input type="hidden" name="mode" id="importModeInput" value="add">
         <input type="file" name="excel_file" id="importExcelInput" accept=".xlsx" class="d-none" onchange="document.getElementById('importExcelForm').submit()">
       </form>
+      <div class="form-check form-check-inline mb-0 me-1" title="Leave unchecked so each CRM's upload adds to the list without deleting others' rows.">
+        <input class="form-check-input" type="checkbox" id="importReplaceCheck" onchange="document.getElementById('importModeInput').value = this.checked ? 'replace' : 'add';">
+        <label class="form-check-label small text-muted" for="importReplaceCheck">Replace all</label>
+      </div>
       <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('importExcelInput').click()">
         <i class="bi bi-upload"></i> Upload
       </button>

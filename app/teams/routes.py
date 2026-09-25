@@ -366,7 +366,7 @@ def _invitation_pdf(team, section, members):
     )
 
 
-def _invitation_import(team, section, ws):
+def _invitation_import(team, section, ws, mode="add"):
     header_map = {
         "name": "name", "full name": "name",
         "phone": "phone", "phone number": "phone", "mobile": "phone",
@@ -426,11 +426,21 @@ def _invitation_import(team, section, ws):
         flash("No rows with a name were found in that file.", "warning")
         return _back(team.id, section)
 
-    for m in _section_query(team, section).all():
-        db.session.delete(m)
-    db.session.flush()
+    existing_members = _section_query(team, section).all()
+    existing_keys = {_norm_name(m.display_name) for m in existing_members}
 
+    if mode == "replace":
+        for m in existing_members:
+            db.session.delete(m)
+        db.session.flush()
+        existing_keys = set()
+
+    added, skipped = 0, 0
     for p in people:
+        key = _norm_name(p["name"])
+        if key in existing_keys:
+            skipped += 1
+            continue
         db.session.add(TeamMember(
             team_id=team.id,
             member_name=p["name"],
@@ -438,21 +448,23 @@ def _invitation_import(team, section, ws):
             section=section,
             extra_fields=p["extra"] or None,
         ))
+        existing_keys.add(key)
+        added += 1
 
-    log_action("update", "Team", team.id, f"Imported {section} list from Excel ({len(people)} people)")
+    log_action("update", "Team", team.id,
+               f"Imported {section} list from Excel ({added} new, {skipped} duplicate(s) skipped)")
     db.session.commit()
 
     problems = _invitation_problem_count(
         _invitation_flags(_section_query(team, section).all())
     )
+    msg = f"Added {added} new participant(s)."
+    if skipped:
+        msg += f" Skipped {skipped} already on the list."
     if problems:
-        flash(
-            f"Imported {len(people)} people. {problems} row(s) need attention and are shown in red "
-            f"(repeated name, phone not 10 digits, or account not 13 digits).",
-            "warning",
-        )
+        flash(msg + f" {problems} row(s) need attention (repeated name, phone not 10 digits, or account not 13 digits).", "warning")
     else:
-        flash(f"Imported {len(people)} people into {section}.", "success")
+        flash(msg, "success")
     return _back(team.id, section)
 
 
@@ -699,6 +711,7 @@ def team_import_excel(team_id):
     section = request.form.get("section") or request.args.get("section")
     if section not in WINDOW_SECTIONS and section != "Participants" and section != "Registration Participants":
         section = WINDOW_SECTIONS[0]
+    mode = request.form.get("mode", "add")   # "add" = merge/skip dupes, "replace" = wipe and reload
 
     file = request.files.get("excel_file")
     if not file or not file.filename:
@@ -717,7 +730,7 @@ def team_import_excel(team_id):
         return _back(team.id, section)
 
     if section in ("Invitation", "Participants", "Registration Participants"):
-        return _invitation_import(team, section, ws)
+        return _invitation_import(team, section, ws, mode=mode)
 
     # Map each column to a known field, or treat it as a new custom field.
     col_map = {}
