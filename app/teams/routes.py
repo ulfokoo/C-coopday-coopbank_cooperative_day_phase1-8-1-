@@ -260,7 +260,7 @@ def _apply_inv_filter(members, filter_col, filter_val):
     return [m for m in members if val in get_val(m)]
 
 
-def _invitation_excel(team, section, members):
+def _invitation_excel(team, section, members, zones=None):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
     from openpyxl.utils import get_column_letter
@@ -310,12 +310,12 @@ def _invitation_excel(team, section, members):
     buf.seek(0)
     return send_file(
         buf, as_attachment=True,
-        download_name=_safe_filename(team.name, section) + ".xlsx",
+        download_name=_safe_filename(team.name, section, *(zones or [])) + ".xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
-def _invitation_pdf(team, section, members):
+def _invitation_pdf(team, section, members, zones=None):
     from xml.sax.saxutils import escape
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
@@ -371,7 +371,7 @@ def _invitation_pdf(team, section, members):
     buf.seek(0)
     return send_file(
         buf, as_attachment=True,
-        download_name=_safe_filename(team.name, section) + ".pdf",
+        download_name=_safe_filename(team.name, section, *(zones or [])) + ".pdf",
         mimetype="application/pdf",
     )
 
@@ -616,11 +616,12 @@ def team_export_excel(team_id):
     if not _is_team_viewer(team):
         abort(403)
     use_windows, section, members = _export_context(team)
+    zones = request.args.getlist("zone")
     members = _apply_inv_filter(members, request.args.get("filter_col"), request.args.get("filter_val"))
-    members = _apply_zone_filter(members, request.args.getlist("zone"))
+    members = _apply_zone_filter(members, zones)
 
     if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
-        return _invitation_excel(team, section, members)
+        return _invitation_excel(team, section, members, zones=zones)
 
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
@@ -889,9 +890,11 @@ def team_export_pdf(team_id):
     if not _is_team_viewer(team):
         abort(403)
     use_windows, section, members = _export_context(team)
+    zones = request.args.getlist("zone")
+    members = _apply_zone_filter(members, zones)
 
-    if use_windows and section == "Invitation":
-        return _invitation_pdf(team, section, members)
+    if use_windows and section in ("Invitation", "Participants", "Registration Participants"):
+        return _invitation_pdf(team, section, members, zones=zones)
 
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
