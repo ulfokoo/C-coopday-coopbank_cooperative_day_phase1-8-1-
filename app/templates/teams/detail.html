@@ -369,8 +369,7 @@
 </div>
 
 {% if can_manage_members %}
-<div class="card">
-{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants', 'Registration Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
+<div class="card-header bg-white fw-bold">{% if use_windows %}{{ 'Add People to ' ~ current_section if current_section in ('Invitation', 'Participants', 'Registration Participants') else 'Add Window Leaders to ' ~ current_section }}{% else %}Add Team Members{% endif %}</div>
   <div class="card-body">
     <form method="POST" action="{{ url_for('teams.team_member_add', team_id=team.id) }}">
       {{ member_form.hidden_tag() }}
